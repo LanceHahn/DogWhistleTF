@@ -1,7 +1,7 @@
 import urllib.request
 from bs4 import BeautifulSoup
 from PresidentialScraper import extract_speech
-
+from preTrainedSample import organizeData
 import os
 
 
@@ -52,7 +52,7 @@ def writeData(labels, searches, new_folder_title):
     :type searches: list
     :param new_folder_title: Title of folder where you want to store the files
     :type new_folder_title: str
-    :return:
+    :return: No return value
     """
     folder_path = os.path.join(os.getcwd(), new_folder_title)
     os.mkdir(folder_path)
@@ -73,8 +73,6 @@ def writeData(labels, searches, new_folder_title):
                 evens.append(i)
             for art_num, article in enumerate(evens):
                 temp = open(os.path.join(current_path, f"{label}_sample_{art_num}.txt"), 'w')
-                temp.write(label)
-                temp.write("\n")
                 temp.write(extract_speech(urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
             try:
                 page = urllib.request.urlopen("https://www.presidency.ucsb.edu" +
@@ -84,13 +82,27 @@ def writeData(labels, searches, new_folder_title):
                 break
 
 
-labels = ["mckinley", "wilson"]
-searches = [
-    "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D="
-    "&to%5Bdate%5D=&person2=200281&category2%5B%5D=75&category2%5B%5D=83&category2%5B%5D=18&category2%5B%5D=85&items_pe"
-    "r_page=100",
-    "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=&"
-    "to%5Bdate%5D=&person2=200284&category2%5B%5D=75&category2%5B%5D=83&category2%5B%5D=18&category2%5B%5D=85&items_per"
-    "_page=100"
-]
-writeData(labels, searches, "Data")
+def fetchData(folder_title):
+    """
+    Return a list of sample and labels after the writeData function was used for presidential data.
+
+    :param folder_title: Title of the folder containing the scraped data, the same folder as the new_folder_title param in writeData
+    :type folder_title: str
+    :return: labels, samples
+    """
+    labels = []
+    samples = []
+    main_dir = os.path.join(os.getcwd(), folder_title)
+    class_list = os.listdir(main_dir)
+    for label in class_list:
+        for file in os.listdir(os.path.join(main_dir, label)):
+            labels.append(label)
+
+            temp = open(os.path.join(main_dir,label, file), 'r')
+            samples.append(temp.read())
+            temp.close()
+    return labels, samples
+
+
+
+
