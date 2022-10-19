@@ -3,7 +3,6 @@ from bs4 import BeautifulSoup
 from PresidentialScraper import extract_speech
 
 import os
-import platform
 
 
 def createData(labels, searches):
@@ -43,7 +42,7 @@ def createData(labels, searches):
     return classes, samples
 
 
-def writeData(labels, searches, new_folder_directory):
+def writeData(labels, searches, new_folder_title):
     """
     Write given speeches to a specified directory.
 
@@ -51,16 +50,16 @@ def writeData(labels, searches, new_folder_directory):
     :type labels: list
     :param searches: Ordered list of presidential archive links, which will be scraped and assigned labels
     :type searches: list
-    :param new_folder_directory: Absolute path of where you want to store the files
-    :type new_folder_directory: str
+    :param new_folder_title: Title of folder where you want to store the files
+    :type new_folder_title: str
     :return:
     """
-    os.mkdir(new_folder_directory)
-    samples = []
-    classes = []
+    folder_path = os.path.join(os.getcwd(), new_folder_title)
+    os.mkdir(folder_path)
+
     page_count = 0
     for label, search in zip(labels, searches):
-        current_path = os.path.join(new_folder_directory, f"{label}")
+        current_path = os.path.join(folder_path, f"{label}")
         os.mkdir(current_path)
 
         search_page = urllib.request.urlopen(search)
@@ -72,8 +71,8 @@ def writeData(labels, searches, new_folder_directory):
             odds = soup.select(".odd")
             for i in odds:
                 evens.append(i)
-            for article in evens:
-                temp = open(os.path.join(current_path, f"{article.select_one('title')}"), 'w')
+            for art_num, article in enumerate(evens):
+                temp = open(os.path.join(current_path, f"{label}_sample_{art_num}.txt"), 'w')
                 temp.write(label)
                 temp.write("\n")
                 temp.write(extract_speech(urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
@@ -85,5 +84,13 @@ def writeData(labels, searches, new_folder_directory):
                 break
 
 
-
-
+labels = ["mckinley", "wilson"]
+searches = [
+    "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D="
+    "&to%5Bdate%5D=&person2=200281&category2%5B%5D=75&category2%5B%5D=83&category2%5B%5D=18&category2%5B%5D=85&items_pe"
+    "r_page=100",
+    "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=&"
+    "to%5Bdate%5D=&person2=200284&category2%5B%5D=75&category2%5B%5D=83&category2%5B%5D=18&category2%5B%5D=85&items_per"
+    "_page=100"
+]
+writeData(labels, searches, "Data")
