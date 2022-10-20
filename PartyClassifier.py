@@ -1,7 +1,7 @@
 import urllib.request
 from bs4 import BeautifulSoup
 from PresidentialScraper import extract_speech
-from preTrainedSample import organizeData
+from preTrainedSample import organizeData, loadEmbedding, designModel, trainModel, useModel
 import os
 
 
@@ -104,5 +104,19 @@ def fetchData(folder_title):
     return labels, samples
 
 
+if __name__ == "__main__":
+    labels = ["obama", "trump"]
+    searches = [
+        "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=&to%5Bdate%5D=&person2=200300&category2%5B%5D=&items_per_page=100",
+        "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=&to%5Bdate%5D=&person2=200301&category2%5B%5D=&items_per_page=100"
+    ]
+    writeData(labels, searches, "data")
+    r_labels, r_samples = fetchData("data")
+    classLabels = [dirname for dirname in sorted(os.listdir(os.getcwd() + "//data"))]
 
-
+    organizeData(r_labels, r_samples, 1, .2)
+    train_samples, train_labels, val_samples, val_labels, vectorizer = organizeData(r_labels, r_samples, 128, .2)
+    embeddingSpace = loadEmbedding(vectorizer, os.path.join(os.getcwd(), "glove.6B", "glove.6B.50d.txt"))
+    model = designModel(embeddingSpace, len(classLabels), 1)
+    model = trainModel(train_samples, train_labels, val_samples, val_labels, vectorizer, model)
+    useModel(model, classLabels)
