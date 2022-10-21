@@ -31,7 +31,8 @@ def createData(labels, searches):
             for i in odds:
                 evens.append(i)
             for article in evens:
-                samples.append(extract_speech(urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
+                samples.append(extract_speech(
+                    urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
                 classes.append(label)
             try:
                 page = urllib.request.urlopen("https://www.presidency.ucsb.edu" +
@@ -46,7 +47,7 @@ def writeData(labels, searches, new_folder_title):
     """
     Write given speeches to a specified directory.
 
-    :param labels: Ordered list of the labels to be assigned to the data generated from the links
+    :param labels: Ordered list of the labels matching presidential archive links
     :type labels: list
     :param searches: Ordered list of presidential archive links, which will be scraped and assigned labels
     :type searches: list
@@ -61,23 +62,29 @@ def writeData(labels, searches, new_folder_title):
     for label, search in zip(labels, searches):
         current_path = os.path.join(folder_path, f"{label}")
         os.mkdir(current_path)
+        art_num = 0
 
         search_page = urllib.request.urlopen(search)
         soup = BeautifulSoup(search_page, "html.parser")
         while search_page is not None:
-            print(f"Processing query page {page_count}")
+            print(f"{page_count * 100} pages out of"
+                  f"{ soup.select_one('div.view-header').getText().split('of')[1].split('records')[0]} processed")
             page_count += 1
             evens = soup.select(".even")
             odds = soup.select(".odd")
             for i in odds:
                 evens.append(i)
-            for art_num, article in enumerate(evens):
-                temp = open(os.path.join(current_path, f"{label}_sample_{art_num}.txt"), 'w')
-                temp.write(extract_speech(urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
+            for article in evens:
+                '''print(f"Processing article #{art_num} of"
+                      f"{ soup.select_one('div.view-header').getText().split('of')[1].split('records')[0]}")'''
+                temp = open(os.path.join(current_path, f"{label}_sample_{art_num}.txt"), 'w', errors="ignore")
+                temp.write(extract_speech(
+                    urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
+                art_num += 1
             try:
-                page = urllib.request.urlopen("https://www.presidency.ucsb.edu" +
-                                              soup.find('a', {'title': 'Go to next page'})['href'])
-                soup = BeautifulSoup(page, "html.parser")
+                search_page = urllib.request.urlopen("https://www.presidency.ucsb.edu" +
+                                                     soup.find('a', {'title': 'Go to next page'})['href'])
+                soup = BeautifulSoup(search_page, "html.parser")
             except TypeError:
                 break
 
@@ -98,7 +105,7 @@ def fetchData(folder_title):
         for file in os.listdir(os.path.join(main_dir, label)):
             labels.append(label)
 
-            temp = open(os.path.join(main_dir,label, file), 'r')
+            temp = open(os.path.join(main_dir, label, file), 'r')
             samples.append(temp.read())
             temp.close()
     return labels, samples
@@ -111,6 +118,7 @@ if __name__ == "__main__":
         "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=&to%5Bdate%5D=&person2=200301&category2%5B%5D=&items_per_page=100"
     ]
     writeData(labels, searches, "data")
+
     r_labels, r_samples = fetchData("data")
     classLabels = [dirname for dirname in sorted(os.listdir(os.getcwd() + "//data"))]
 
