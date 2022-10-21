@@ -3,6 +3,8 @@ Originally inspired by
 https://keras.io/examples/nlp/pretrained_word_embeddings/
 """
 
+import platform
+
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -234,10 +236,17 @@ if __name__ == '__main__':
     samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer = organizeData(labels, data, batchSize=128,
                                                                                           validSplit=0.2,
                                                                                           mxVocab=20000, mxSentence=200)
-    embedFileName = os.path.join(
-        os.path.expanduser("~"), "C:\\Users\\drlwh\\OneDrive\\Documents\\GitHub\\DogWhistleTF\\"
-                                 f"glove.6B\\glove.6B.{embedding_dim}d.txt"
-    )
+    if platform.system() == 'Darwin':
+        embedFileName = os.path.join(
+            os.path.expanduser("~"), "/Users/lance/Documents/GitHub/DogWhistleTF/"
+                                     f"glove.6B/glove.6B.{embedding_dim}d.txt")
+    else:
+        print("You are not running on an Apple and probably need to change"
+              "the file path name for the embedding text file.")
+        embedFileName = os.path.join(
+            os.path.expanduser("~"), "/Users/lance/Documents/GitHub/DogWhistleTF/"
+                                     f"glove.6B/glove.6B.{embedding_dim}d.txt")
+
     embedSpace = loadEmbedding(vectorizer, embedFileName)
     modelArch = designModel(embedSpace, len(classLabels), batchSize)
     modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer, modelArch)
