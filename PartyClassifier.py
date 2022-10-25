@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from PresidentialScraper import extract_speech
 from preTrainedSample import organizeData, loadEmbedding, designModel, trainModel, useModel
 import os
-
+import io
 
 def createData(labels, searches):
     """
@@ -66,7 +66,7 @@ def writeData(labels, searches, new_folder_title):
 
         search_page = urllib.request.urlopen(search)
         soup = BeautifulSoup(search_page, "html.parser")
-        while search_page is not None:
+        while search_page is not None and page_count < 2:
             print(f"{page_count * 100} pages out of"
                   f"{ soup.select_one('div.view-header').getText().split('of')[1].split('records')[0]} processed")
             page_count += 1
@@ -74,13 +74,14 @@ def writeData(labels, searches, new_folder_title):
             odds = soup.select(".odd")
             for i in odds:
                 evens.append(i)
-            for article in evens:
-                '''print(f"Processing article #{art_num} of"
-                      f"{ soup.select_one('div.view-header').getText().split('of')[1].split('records')[0]}")'''
-                temp = open(os.path.join(current_path, f"{label}_sample_{art_num}.txt"), 'w', errors="ignore")
-                temp.write(extract_speech(
-                    urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
-                art_num += 1
+            with io.open(os.path.join(current_path, f"{label}_sample_{art_num}.txt"), 'w', encoding="utf-8"):
+                for article in evens:
+                    # print(f"Processing article #{art_num} of"
+                    #     f"{ soup.select_one('div.view-header').getText().split('of')[1].split('records')[0]}")
+                    f = open(os.path.join(current_path, f"{label}_sample_{art_num}.txt"), 'w', errors="ignore")
+                    f.write(extract_speech(
+                        urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
+                    art_num += 1
             try:
                 search_page = urllib.request.urlopen("https://www.presidency.ucsb.edu" +
                                                      soup.find('a', {'title': 'Go to next page'})['href'])
@@ -99,32 +100,30 @@ def fetchData(folder_title):
     """
     labels = []
     samples = []
+    label_index = 0
+
     main_dir = os.path.join(os.getcwd(), folder_title)
     class_list = os.listdir(main_dir)
     for label in class_list:
         for file in os.listdir(os.path.join(main_dir, label)):
-            labels.append(label)
-
-            temp = open(os.path.join(main_dir, label, file), 'r')
+            labels.append(label_index)
+            temp = open(os.path.join(main_dir, label, file), 'r', errors='ignore', encoding='utf-8')
             samples.append(temp.read())
             temp.close()
+        label_index += 1
     return labels, samples
 
 
 if __name__ == "__main__":
-    labels = ["obama", "trump"]
-    searches = [
-        "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=&to%5Bdate%5D=&person2=200300&category2%5B%5D=&items_per_page=100",
-        "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=&to%5Bdate%5D=&person2=200301&category2%5B%5D=&items_per_page=100"
-    ]
-    writeData(labels, searches, "data")
 
-    r_labels, r_samples = fetchData("data")
-    classLabels = [dirname for dirname in sorted(os.listdir(os.getcwd() + "//data"))]
-
-    organizeData(r_labels, r_samples, 1, .2)
-    train_samples, train_labels, val_samples, val_labels, vectorizer = organizeData(r_labels, r_samples, 128, .2)
+    labels = ["trump", "obama"]
+    searches = ["https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=10-10-2018&to%5Bdate%5D=07-06-2019&person2=200301&category2%5B%5D=&items_per_page=100",
+                "https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=10-10-2015&to%5Bdate%5D=07-06-2016&person2=200300&items_per_page=100"]
+    writeData(labels, searches, "small_data")
+    r_labels, r_samples = fetchData("small_data")
+    classLabels = [dirname for dirname in sorted(os.listdir(os.getcwd() + "//small_data"))]
+    train_samples, train_labels, val_samples, val_labels, vectorizer = organizeData(r_labels, r_samples, 10, .2)
     embeddingSpace = loadEmbedding(vectorizer, os.path.join(os.getcwd(), "glove.6B", "glove.6B.50d.txt"))
-    model = designModel(embeddingSpace, len(classLabels), 1)
-    model = trainModel(train_samples, train_labels, val_samples, val_labels, vectorizer, model)
-    useModel(model, classLabels)
+    modelArch = designModel(embeddingSpace, len(classLabels), 10, vectorizer)
+    modelTrained = trainModel(train_samples, train_labels, val_samples, val_labels, vectorizer, modelArch)
+    useModel(modelTrained, classLabels)
