@@ -74,7 +74,6 @@ class PresidentialScraper:
             "we'd": "we had",
             "he'd": "he had",
             "we're": "we are",
-            "they're": "they are",
             "is'nt": "is not",
             "that's": "that is",
             "it's": "it is",

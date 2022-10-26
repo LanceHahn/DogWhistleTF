@@ -76,11 +76,13 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
     """
     # Shuffle the data
     seed = 1337
+    sampleIX = [x for x in range(len(samples))]
     rng = np.random.RandomState(seed)
-    rng.shuffle(samples)
-    rng = np.random.RandomState(seed)
-    rng.shuffle(labels)
+    rng.shuffle(sampleIX)
+    samples = [samples[sampleIX[i]] for i in range(len(samples))]
+    labels = [labels[sampleIX[i]] for i in range(len(samples))]
 
+    print("NOTE:  the samples are randomized and chosen without any attempt to balance the representation of the different classes.")
     # Extract a training & validation split
     num_validation_samples = int(validSplit * len(samples))
     print(f"{validSplit} of dataset of {len(samples)} is divided into {len(samples)-num_validation_samples} training samples and"
@@ -89,8 +91,14 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
     val_samples = samples[-num_validation_samples:]
     train_labels = labels[:-num_validation_samples]
     val_labels = labels[-num_validation_samples:]
-    print(f"{len(train_samples)} training samples")
-    print(f"{len(val_labels)} validation samples")
+    train_label_count = {}
+    train_label_count[0] = sum(1 for lab in train_labels if lab == 0)
+    train_label_count[1] = sum(1 for lab in train_labels if lab == 1)
+    val_label_count = {}
+    val_label_count[0] = sum(1 for lab in val_labels if lab == 0)
+    val_label_count[1] = sum(1 for lab in val_labels if lab == 1)
+    print(f"{len(train_samples)} training samples {train_label_count[0]}/{train_label_count[1]}")
+    print(f"{len(val_labels)} validation samples  {val_label_count[0]}/{val_label_count[1]}")
     print(f"Vector representing a sentence is at most {mxSentence} tokens long.")
     print(f"Vocabulary is the top {mxVocab} words.")
     print(f"The training sample will be processed in batches containing {batchSize} values.")
@@ -206,6 +214,12 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer, model
 def useModel(model, classLabels):
 
     testText = "this message is about computer graphics and 3D modeling"
+    probabilities = model.predict([[testText]])
+    print(f"'{testText}' -> {classLabels[np.argmax(probabilities[0])]}")
+    testText = "I am a republican"
+    probabilities = model.predict([[testText]])
+    print(f"'{testText}' -> {classLabels[np.argmax(probabilities[0])]}")
+    testText = "I am a democrat"
     probabilities = model.predict([[testText]])
     print(f"'{testText}' -> {classLabels[np.argmax(probabilities[0])]}")
     print("Enter QUIT to stop being prompted for a phrase.")
