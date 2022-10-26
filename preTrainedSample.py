@@ -194,7 +194,7 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer, model
     model.compile(
         loss="sparse_categorical_crossentropy", optimizer="rmsprop", metrics=["acc"]
     )
-    model.fit(x_train, y_train, batch_size=10, epochs=20, validation_data=(x_val, y_val))
+    model.fit(x_train, y_train, batch_size=128, epochs=20, validation_data=(x_val, y_val))
     string_input = keras.Input(shape=(1,), dtype="string")
     x = vectorizer(string_input)
     preds = model(x)
