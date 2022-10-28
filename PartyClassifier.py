@@ -44,7 +44,7 @@ def createData(labels, searches):
     return classes, samples
 
 
-def writeData(labels, searches, new_folder_title):
+def writeData(labels, searches, new_folder_title, docMax):
     """
     Write given speeches to a specified directory.
 
@@ -58,7 +58,6 @@ def writeData(labels, searches, new_folder_title):
     """
     folder_path = os.path.join(os.getcwd(), new_folder_title)
     os.mkdir(folder_path)
-
     page_count = 0
     for label, search in zip(labels, searches):
         current_path = os.path.join(folder_path, f"{label}")
@@ -67,9 +66,14 @@ def writeData(labels, searches, new_folder_title):
 
         search_page = urllib.request.urlopen(search)
         soup = BeautifulSoup(search_page, "html.parser")
-        while search_page is not None and page_count < 2:
-            print(f"{page_count * 100} pages out of"
-                  f"{ soup.select_one('div.view-header').getText().split('of')[1].split('records')[0]} processed")
+        if soup.select_one('div.view-header') is not None:
+            tests = soup.select_one('div.view-header').getText().split('of')[1].split('records')
+            print(f"Search for {label} produced "
+                  f"{soup.select_one('div.view-header').getText().split('of')[1].split('records')[0]} records")
+            print(f"We are targeting {docMax} of them.")
+        else:
+            print(f"A file was encountered without a div.view-header")
+        while search_page is not None and art_num < docMax:
             page_count += 1
             evens = soup.select(".even")
             odds = soup.select(".odd")
@@ -82,8 +86,7 @@ def writeData(labels, searches, new_folder_title):
                     f = open(os.path.join(current_path, f"{label}_sample_{art_num}.txt"), 'w', errors="ignore")
                     speechLink = urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])
                     f.write(extract_speech(speechLink))
-                    # f.write(extract_speech(
-                    #     urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
+                    print(f"{art_num} ", end="")
                     art_num += 1
             try:
                 search_page = urllib.request.urlopen("https://www.presidency.ucsb.edu" +
@@ -125,12 +128,14 @@ if __name__ == "__main__":
     jobLabel = f"data_{itemsPerPage}"
     searches = [f"https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=10-10-2018&to%5Bdate%5D=07-06-2019&person2=200301&category2%5B%5D=&items_per_page={itemsPerPage}",
                 f"https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=10-10-2015&to%5Bdate%5D=07-06-2016&person2=200300&items_per_page={itemsPerPage}"]
+    
     if os.path.exists(os.path.join(os.getcwd(), jobLabel)):
         print(f"Skipping search because there is a data repo at {jobLabel}")
     else:
         writeData(labels, searches, jobLabel)
     r_labels, r_samples = fetchData(jobLabel)
     classLabels = [dirname for dirname in sorted(os.listdir(os.getcwd() + f"//{jobLabel}"))]
+
     train_samples, train_labels, val_samples, val_labels, vectorizer = organizeData(r_labels, r_samples, 10, .2)
     embeddingSpace = loadEmbedding(vectorizer, os.path.join(os.getcwd(), "glove.6B", "glove.6B.50d.txt"))
     modelArch = designModel(embeddingSpace, len(classLabels), 10, vectorizer)
