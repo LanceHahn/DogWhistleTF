@@ -4,8 +4,7 @@ import urllib.request
 
 import nltk
 from nltk.corpus import stopwords
-nltk.download('stopwords')
-nltk.download('punkt')
+
 import urllib.request
 import warnings
 import re
@@ -15,7 +14,8 @@ import ssl
 
 
 ssl._create_default_https_context = ssl._create_unverified_context
-
+nltk.download('stopwords')
+nltk.download('punkt')
 
 class PresidentialScraper:
     def __init__(self, link):

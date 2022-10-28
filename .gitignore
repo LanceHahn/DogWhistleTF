@@ -1,3 +1,4 @@
 glove.6B/
 venv/
 .idea/
+.DS_Store

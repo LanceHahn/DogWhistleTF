@@ -4,6 +4,7 @@ from PresidentialScraper import extract_speech
 from preTrainedSample import organizeData, loadEmbedding, designModel, trainModel, useModel
 import os
 import io
+import glob
 
 def createData(labels, searches):
     """
@@ -83,8 +84,8 @@ def writeData(labels, searches, new_folder_title, docMax):
                     # print(f"Processing article #{art_num} of"
                     #     f"{ soup.select_one('div.view-header').getText().split('of')[1].split('records')[0]}")
                     f = open(os.path.join(current_path, f"{label}_sample_{art_num}.txt"), 'w', errors="ignore")
-                    f.write(extract_speech(
-                        urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])))
+                    speechLink = urllib.request.urlopen("https://www.presidency.ucsb.edu" + article.select('a')[1]['href'])
+                    f.write(extract_speech(speechLink))
                     print(f"{art_num} ", end="")
                     art_num += 1
             try:
@@ -110,7 +111,8 @@ def fetchData(folder_title):
     main_dir = os.path.join(os.getcwd(), folder_title)
     class_list = os.listdir(main_dir)
     for label in class_list:
-        for file in os.listdir(os.path.join(main_dir, label)):
+        for file in glob.glob(f"{os.path.join(main_dir, label)}/*.txt"):
+        #for file in os.listdir(os.path.join(main_dir, label)):
             labels.append(label_index)
             temp = open(os.path.join(main_dir, label, file), 'r', errors='ignore', encoding='utf-8')
             samples.append(temp.read())
@@ -122,17 +124,18 @@ def fetchData(folder_title):
 if __name__ == "__main__":
 
     labels = ["trump", "obama"]
-    itemsPerPage = 100
+    itemsPerPage = 10
+    jobLabel = f"data_{itemsPerPage}"
     searches = [f"https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=10-10-2018&to%5Bdate%5D=07-06-2019&person2=200301&category2%5B%5D=&items_per_page={itemsPerPage}",
                 f"https://www.presidency.ucsb.edu/advanced-search?field-keywords=&field-keywords2=&field-keywords3=&from%5Bdate%5D=10-10-2015&to%5Bdate%5D=07-06-2016&person2=200300&items_per_page={itemsPerPage}"]
-    pathLabel = f"data_{itemsPerPage}"
-
-    if os.path.exists(os.path.join(os.getcwd(), pathLabel)):
-        print(f"Skipping doc acquisition because {pathLabel} already exists.")
+    
+    if os.path.exists(os.path.join(os.getcwd(), jobLabel)):
+        print(f"Skipping search because there is a data repo at {jobLabel}")
     else:
-        writeData(labels, searches, pathLabel, docMax=itemsPerPage)
-    r_labels, r_samples = fetchData(pathLabel)
-    classLabels = [dirname for dirname in sorted(os.listdir(os.getcwd() + f"//{pathLabel}"))]
+        writeData(labels, searches, jobLabel)
+    r_labels, r_samples = fetchData(jobLabel)
+    classLabels = [dirname for dirname in sorted(os.listdir(os.getcwd() + f"//{jobLabel}"))]
+
     train_samples, train_labels, val_samples, val_labels, vectorizer = organizeData(r_labels, r_samples, 10, .2)
     embeddingSpace = loadEmbedding(vectorizer, os.path.join(os.getcwd(), "glove.6B", "glove.6B.50d.txt"))
     modelArch = designModel(embeddingSpace, len(classLabels), 10, vectorizer)
