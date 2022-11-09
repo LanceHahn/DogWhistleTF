@@ -94,8 +94,8 @@ def compareEmbeddings(untrained, trained):
 
 
 if __name__ == "__main__":
-    organizeData(fetchData("trump_obama_corpus"))
     new_embed = retrainEmbeddings(50, "trump_obama_corpus", 128, 5)
-    old_embed = loadEmbedding(organizeData(fetchData("trump_obama_corpus"))[4], os.path.join(os.getcwd(), "glove.6B", "glove.6b.50d.txt"))
+    l, s = fetchData("trump_obama_corpus")
+    old_embed = loadEmbedding(organizeData(l, s)[4], os.path.join(os.getcwd(), "glove.6B", "glove.6b.50d.txt"))
     compareEmbeddings(old_embed, new_embed)
     
