@@ -98,17 +98,7 @@ def fetchData(folder_title):
         for file in os.listdir(os.path.join(main_dir, label)):
             labels.append(label)
 
-            temp = open(os.path.join(main_dir,label, file), 'r')
+            temp = open(os.path.join(main_dir,label, file), 'r', errors="ignore", encoding="utf-8")
             samples.append(temp.read())
             temp.close()
     return labels, samples
-
-
-whole_labels, whole_samples = fetchData("trump_obama_corpus")
-train_samples, train_labels, val_samples, val_labels, vectorizer = organizeData(whole_labels, whole_samples)
-
-mat = loadEmbedding(os.path.join(os.getcwd(), "glove.6B", "glove.6B.txt"), vectorizer)
-
-modelArch = designModel(mat, len(set(val_labels)), 128)
-modelTrained = trainModel(train_samples, train_labels, val_samples, val_labels, vectorizer, modelArch)
-useModel(modelTrained, ["obama", "trump"])
