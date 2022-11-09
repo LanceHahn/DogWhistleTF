@@ -1,7 +1,7 @@
 import urllib.request
 from bs4 import BeautifulSoup
 from PresidentialScraper import extract_speech
-from preTrainedSample import organizeData
+from preTrainedSample import organizeData, loadEmbedding, designModel, trainModel, useModel
 import os
 
 
@@ -104,5 +104,11 @@ def fetchData(folder_title):
     return labels, samples
 
 
+whole_labels, whole_samples = fetchData("trump_obama_corpus")
+train_samples, train_labels, val_samples, val_labels, vectorizer = organizeData(whole_labels, whole_samples)
 
+mat = loadEmbedding(os.path.join(os.getcwd(), "glove.6B", "glove.6B.txt"), vectorizer)
 
+modelArch = designModel(mat, len(set(val_labels)), 128)
+modelTrained = trainModel(train_samples, train_labels, val_samples, val_labels, vectorizer, modelArch)
+useModel(modelTrained, ["obama", "trump"])
