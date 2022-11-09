@@ -65,6 +65,7 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
     Break the data into a training set and a validation set.  Also create
     a vectorizer that can be used to convert a string into a list of indexes which
     can be used to train and use the model
+
     :param labels: the list of labels associated with the data samples
     :param samples: the list of the data samples
     :param batchSize: how many data samples are processed at one time
@@ -126,7 +127,7 @@ def loadEmbedding(vectorizer, embedFile):
     hits = 0
     misses = 0
     # Prepare embedding matrix
-    embedding_matrix = np.zeros((num_tokens, embedding_dim))
+    embedding_matrix = np.zeros((num_tokens, len(embeddings_index['the'])))
     missed = set()
     for word, i in word_index.items():
         embedding_vector = embeddings_index.get(word)
@@ -144,7 +145,7 @@ def loadEmbedding(vectorizer, embedFile):
     return embedding_matrix
 
 
-def designModel(embedMatrix, classCount, batchSize):
+def designModel(embedMatrix, classCount, batchSize, vectorizer):
     # Create the keras embedding layer and initialize it using our acquired embedding vectors
     #from tensorflow.keras.layers import Embedding
     from keras.layers import Embedding
@@ -152,7 +153,7 @@ def designModel(embedMatrix, classCount, batchSize):
     num_tokens = len(voc) + 2
     embedding_layer = Embedding(
         num_tokens,
-        embedding_dim,
+        len(embedMatrix[0]),
         embeddings_initializer=keras.initializers.Constant(embedMatrix),
         trainable=False,
     )
@@ -219,7 +220,7 @@ def useModel(model, classLabels):
 
 
 if __name__ == '__main__':
-    embedding_dim = 100
+    embedding_dim = 50
     batchSize = 128
     data_path = keras.utils.get_file(
         "news20.tar.gz",
@@ -234,11 +235,8 @@ if __name__ == '__main__':
     samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer = organizeData(labels, data, batchSize=128,
                                                                                           validSplit=0.2,
                                                                                           mxVocab=20000, mxSentence=200)
-    embedFileName = os.path.join(
-        os.path.expanduser("~"), "C:\\Users\\drlwh\\OneDrive\\Documents\\GitHub\\DogWhistleTF\\"
-                                 f"glove.6B\\glove.6B.{embedding_dim}d.txt"
-    )
+    embedFileName = os.path.join(os.getcwd(), "glove.6B", "glove.6B.50d.txt")
     embedSpace = loadEmbedding(vectorizer, embedFileName)
-    modelArch = designModel(embedSpace, len(classLabels), batchSize)
+    modelArch = designModel(embedSpace, len(classLabels), batchSize, vectorizer)
     modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer, modelArch)
     useModel(modelTrained, classLabels)
