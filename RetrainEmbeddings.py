@@ -1,4 +1,5 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 import numpy as np
 from scipy.spatial import distance
 from tensorflow import keras
@@ -32,7 +33,7 @@ def retrainEmbeddings(dim, folderName, batchSize, windowSz) -> np.array:
         embeddings_initializer=keras.initializers.Constant(standard_embeddings),
         trainable = True
     )
-
+    
     int_input = keras.Input(shape=(None,), dtype="int64")
     embedded_int = embedding_layer(int_input)
 
@@ -63,7 +64,7 @@ def retrainEmbeddings(dim, folderName, batchSize, windowSz) -> np.array:
     )
 
     main_model.fit(int_train_samples, int_train_labels, batch_size=128,
-    epochs=20, validation_data=(int_val_samples, int_val_labels))
+    epochs=10, validation_data=(int_val_samples, int_val_labels))
 
     string_layer = keras.Input(shape=(1,), dtype="string")
     x = vectorizer(string_layer)
@@ -71,31 +72,40 @@ def retrainEmbeddings(dim, folderName, batchSize, windowSz) -> np.array:
     main_model.summary()
     final_model = keras.Model(string_layer, preds)
     final_model.summary()
-    return embedding_layer.embeddings
+    return embedding_layer, vectorizer
 
 
-def compareEmbeddings(untrained, trained):
+def compareEmbeddings(untrained_mat, trained_layer, vectorizer, n_words):
     """Function comparing word embedding similarities from two embedding spaces using GenSim
 
     Args:
         untrained (Numpy matrix): Standard embedding space
-        trained (Numpy matrix): Retrained/customized embedding space
+        trained (Numpy matrix): Retrained/customized embedding space as Keras Embedding layer
+        vectorier (TensorFlow TextVectorization object): Vectorizer used to create trained embeddings
+        n_words (int): Number of most similar words to compare
     """
-    if len(untrained) != len(trained):
-        raise Exception("Matrix dimensions must be identical")
+    untrained_layer = layers.Embedding(
+        len(vectorizer.get_vocabulary()) + 2,
+        len(untrained_mat[0]),
+        embeddings_initializer=keras.initializers.Constant(untrained_mat),
+        trainable=False
+    )
 
-    untr_dict={}
-    tr_dict = {}
-    with open(os.path.join(os.getcwd(), "glove.6B", "glove.6B.50d.txt")) as f:
-        for line, untr_vect, tr_vect in zip(f, untrained, trained):
-            word = line.split(maxsplit=1)[0]
-        untr_dict[word] = untr_vect
-        tr_dict[word] = tr_vect
+    trained_mat = trained_layer.weights[0].numpy()
+    vocab = np.array(vectorizer.get_vocabulary())
 
+
+    test = input("Input word to be compared(enter quit to stop being prompted): ")
+    while(test.lower() != "quit"):
+        print(f"Using standard embeddings, the {n_words} most similar words for {test} are:")
+        print(vocab[np.argpartition(distance.cdist([untrained_layer(vectorizer(test))[0]], untrained_layer.weights[0].numpy()), n_words+1)[0][1:n_words]])
+        print(f"Using customized embeddings, the {n_words} most similar words for {test} are:")
+        print(vocab[np.argpartition(distance.cdist([trained_layer(vectorizer(test))[0]], trained_layer.weights[0].numpy()), n_words+1)[0][1:n_words]])
+        test = input("Input word to be compared(enter quit to stop being prompted): ")
+        
 
 if __name__ == "__main__":
-    new_embed = retrainEmbeddings(50, "trump_obama_corpus", 128, 5)
-    l, s = fetchData("trump_obama_corpus")
-    old_embed = loadEmbedding(organizeData(l, s)[4], os.path.join(os.getcwd(), "glove.6B", "glove.6b.50d.txt"))
-    compareEmbeddings(old_embed, new_embed)
+    new_embed, vectorizer = retrainEmbeddings(50, "trump_obama_corpus", 128, 5)
+    old_embed = loadEmbedding(vectorizer, os.path.join(os.getcwd(), "glove.6B", "glove.6b.50d.txt"))
+    compareEmbeddings(old_embed, new_embed, vectorizer, 5)
     
