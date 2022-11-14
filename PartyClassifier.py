@@ -92,13 +92,16 @@ def fetchData(folder_title):
     """
     labels = []
     samples = []
+    label_index = 0
+
     main_dir = os.path.join(os.getcwd(), folder_title)
     class_list = os.listdir(main_dir)
     for label in class_list:
         for file in os.listdir(os.path.join(main_dir, label)):
-            labels.append(label)
+            labels.append(label_index)
 
             temp = open(os.path.join(main_dir,label, file), 'r', errors="ignore", encoding="utf-8")
             samples.append(temp.read())
             temp.close()
+        label_index += 1
     return labels, samples
