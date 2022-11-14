@@ -4,8 +4,8 @@ import urllib.request
 
 import nltk
 from nltk.corpus import stopwords
-nltk.download('stopwords')
-nltk.download('punkt')
+nltk.download('stopwords', quiet=True)
+nltk.download('punkt', quiet=True)
 import urllib.request
 import warnings
 import re
