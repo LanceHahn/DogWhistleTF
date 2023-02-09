@@ -25,7 +25,11 @@ class Scraper:
             body_text += p.getText()
         return body_text
 
-    def slate_n_articles(self, link: str, n : int) -> list:
+    def slate_n_articles(self, n : int) -> list:
+        page = urllib.request.urlopen("https://slate.com/")
+        soup = BeautifulSoup(page)
+        link = soup.select("a.story-card__link")[0]['href']
+
         texts = []
         for _ in range(n):
             page = urllib.request.urlopen(link)
@@ -47,8 +51,12 @@ class Scraper:
             full_text += p.getText()
         return full_text
 
-    def msnbc_n_articles(self, link: str, n: int) -> list:
+    def msnbc_n_articles(self, n: int) -> list:
+        page = urllib.request.urlopen("https://www.msnbc.com/")
+        soup = BeautifulSoup(page)
+        link = soup.select(".smorgasbord-meta-content__headline.smorgasbord-meta-content__headline--L a")[0]['href']
         texts = []
+
         for _ in range(n):
             page = urllib.request.urlopen(link)
             soup = BeautifulSoup(page, features="lxml")
@@ -69,15 +77,40 @@ class Scraper:
             full_text += p.getText()
         return full_text
 
-    def newsmax_n_articles(self, link: str, n: int) -> str:
+    def newsmax_n_articles(self, n: int) -> list:
+        page = urllib.request.urlopen("https://www.newsmax.com/")
+        soup = BeautifulSoup(page)
+        link = "https://www.newsmax.com" + soup.select("#nmCanvas6 h1 a.Default")[0]['href']
+
         texts = []
-        for i in range(n):
+        for _ in range(n):
             page = urllib.request.urlopen(link)
             soup = BeautifulSoup(page, "html.parser")
             texts.append(self.article_from_link(link))
 
             next_page_link = soup.select("a.likeCommH2")[0]
             link = "https://www.newsmax.com" + next_page_link['href']
+        return texts
+
+    def breitbart_from_link(self, link: str) -> str:
+        page = urllib.request.urlopen(link)
+        soup = BeautifulSoup(page, "html.parser")
+        full_text = ""
+
+        paragraphs = soup.select("p.a8d-pre")
+        for p in paragraphs:
+            full_text += p.getText()
+        return full_text
+
+    def breitbart_n_articles(self, link: str, n: int) -> list:
+        texts = []
+        for _ in range(n):
+            page = urllib.request.urlopen(link)
+            soup = BeautifulSoup(page)
+            texts.append(self.article_from_link(link))
+            
+            next_button = soup.select("#DQSW h2 ul li a")[0]
+            link = next_button['href']
         return texts
 
     def article_from_link(self, link):
@@ -88,12 +121,14 @@ class Scraper:
             "msn" : self.msnbc_from_link,
             "fox" : self.fox_from_link,
             "new": self.newsmax_from_link,
-            "sla": self.slate_from_link
+            "sla": self.slate_from_link,
+            "bre": self.breitbart_from_link
         }
 
         self.pages_accessed += 1
 
         return function_dict[site](link)
+
     def n_articles(self, link):
         site = link.rsplit("www.", 1)[1][:3]
         function_dict = {
@@ -107,5 +142,8 @@ class Scraper:
             f.write(self.article_from_link(link))
 
 
-test = Scraper()
-print(test.slate_n_articles("https://slate.com/technology/2023/02/twitter-api-bots-elon-musk.html", 3))
+if __name__ == "__main__":
+
+    ex = Scraper()
+    arts = ex.newsmax_n_articles(2)
+    print(arts)
