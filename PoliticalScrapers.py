@@ -27,25 +27,27 @@ class Scraper:
         return body_text
 
     def slate_n_articles(self, n: int) -> list:
-        page = urllib.request.urlopen("https://slate.com/")
+        page = urllib.request.urlopen("https://slate.com/news-and-politics")
         soup = BeautifulSoup(page, "html.parser")
-        link = soup.select("a.story-card__link")[0]['href']
-
         texts = []
-        for _ in range(n):
-            page = urllib.request.urlopen(link)
-            soup = BeautifulSoup(page, features="lxml")
-            texts.append(self.article_from_link(link))
+        article_num = page_num = 0
+        while article_num < n:
+            links = soup.select("a.topic-story")
+            for link in (page['href'] for page in links):
+                texts.append(self.article_from_link(link))
+                article_num += 1
+                if article_num >= n:
+                    break
+            page = urllib.request.urlopen(f"https://slate.com/news-and-politics/{page_num}#recent")
+            soup = BeautifulSoup(page, "html.parser")
 
-            next_article = soup.select("a.in-article-recirc__link")[0]
-            link = next_article['href']
         return texts
 
 
             
     def msnbc_from_link(self, link: str) -> str:
         page = urllib.request.urlopen(link) 
-        soup = BeautifulSoup(page, "lxml")
+        soup = BeautifulSoup(page, "html.parser")
         paragraphs = soup.select(".showblog-body__content p")
         full_text = ""
         for p in paragraphs:
@@ -60,7 +62,7 @@ class Scraper:
 
         for _ in range(n):
             page = urllib.request.urlopen(link)
-            soup = BeautifulSoup(page, features="lxml")
+            soup = BeautifulSoup(page, features="html.parser")
             texts.append(self.article_from_link(link))
 
             div = soup.select(".styles_navItemLink__rw4pC")
@@ -175,4 +177,4 @@ class Scraper:
 
 if __name__ == "__main__":
     test = Scraper()
-    test.create_dataset(['breitbart_articles'], ['bre'], 50)
+    test.create_dataset(['slate'], ['sla'], 17)
