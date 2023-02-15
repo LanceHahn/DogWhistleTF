@@ -13,6 +13,19 @@ import os
 import pathlib
 
 
+def findSampleMax(data_dir, dirnames):
+    maxClassSample = 0
+    classCounts = {}
+    for dirname in sorted(dirnames):
+        fnames = os.listdir(data_dir / dirname)
+        classCounts[dirname] = len(fnames)
+        if maxClassSample == 0:
+            maxClassSample = len(fnames)
+        elif maxClassSample > len(fnames):
+            maxClassSample = len(fnames)
+
+    return maxClassSample
+
 def acquireData(dataDir):
     """
     generate a list of labels and sample data by processing the path provided
@@ -22,30 +35,36 @@ def acquireData(dataDir):
     """
     print(f"Reading in training and testing data from {dataDir}")
     dirnames = os.listdir(dataDir)
+    dirnames = sorted([x for x in dirnames if '.DS_Store' != x])
     print("We've created an access point to some newsgroup data. \nSummary Info:")
     print("Number of directories:", len(dirnames))
     print("Directory names:", dirnames)
 
-    fnames = os.listdir(dataDir / "comp.graphics")
-    print("As an example, here are the number of files in one directory named `comp.graphics`:", len(fnames))
-    print("Some example filenames from 'comp.graphics':", fnames[:5])
+    sampleDir = dirnames[0]
+    fnames = os.listdir(dataDir / sampleDir)
+    print(f"As an example, here are the number of files in one directory named `{sampleDir}`:", len(fnames))
+    print(f"Some example filenames from '{sampleDir}':", fnames[:5])
 
-    sampleFile = dataDir / "comp.graphics" / "38987"
+    sampleFile = dataDir / sampleDir / fnames[0]
     print(f"\nA sample file ({sampleFile}) contents:")
-    print(open(dataDir / "comp.graphics" / "38987").read())
+    print(open(dataDir / sampleDir / fnames[0]).read())
     print("Acquiring data as a list of document strings and a list of labels associated with the strings.")
     print("The class name is the source discussion board and the label is the index")
     samples = []
     labels = []
     class_names = []
     class_index = 0
-    for dirname in sorted(os.listdir(data_dir)):
+    maxClassSample = findSampleMax(data_dir, dirnames)
+    for dirname in sorted(dirnames):
         class_names.append(dirname)
         dirpath = data_dir / dirname
         fnames = os.listdir(dirpath)
         print(f"Processing directory {dirname}, {len(fnames)} files will be associated "
               f"with the label {dirname}")
-        for fname in fnames:
+        for IX, fname in enumerate(fnames):
+            if IX >= maxClassSample:
+                IX = IX -1
+                break
             fpath = dirpath / fname
             f = open(fpath, encoding="latin-1")
             content = f.read()
@@ -54,6 +73,7 @@ def acquireData(dataDir):
             content = "\n".join(lines)  # recombine msg as single string
             samples.append(content)  # list of training strings/documents
             labels.append(class_index)   # label index associated with text
+        print(f"{dirname} class:  {len(fnames)} samples available and {IX + 1} used.")
         class_index += 1
     print(f"Classes ({len(class_names)}):", class_names)
     print("Number of samples:", len(samples))
@@ -83,7 +103,7 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
 
     # Extract a training & validation split
     num_validation_samples = int(validSplit * len(samples))
-    print(f"{validSplit} of dataset of {len(samples)} is divided into {len(samples)-num_validation_samples} training samples and"
+    print(f"{validSplit} of dataset of total {len(samples)} is separated into {len(samples)-num_validation_samples} training samples and"
           f" {num_validation_samples} validation samples.")
     train_samples = samples[:-num_validation_samples]
     val_samples = samples[-num_validation_samples:]
@@ -220,22 +240,33 @@ def useModel(model, classLabels):
 
 
 if __name__ == '__main__':
-    embedding_dim = 50
+    embedding_dim = 300
     batchSize = 128
-    data_path = keras.utils.get_file(
-        "news20.tar.gz",
-        "http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-20/www/data/news20.tar.gz",
-        untar=True,
-    )
-    data_dir = pathlib.Path(data_path).parent / "20_newsgroup"
+    dataSource = ['local', "news"][0]
+    if dataSource == "news":
+        # news groups
+        data_path = keras.utils.get_file(
+            "news20.tar.gz",
+            "http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-20/www/data/news20.tar.gz",
+            untar=True,
+        )
+        data_dir = pathlib.Path(data_path).parent / "20_newsgroup"
+    else:
+        # local data
+        data_dir = pathlib.Path("data")
+
+    dirnames = os.listdir(data_dir)
+    dirnames = sorted([x for x in dirnames if '.DS_Store' != x])
     labels, data = acquireData(data_dir)
-    classLabels = [dirname for dirname in sorted(os.listdir(data_dir))]
+
+    classLabels = dirnames.copy()
     classCount = len(list(set(labels)))
 
-    samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer = organizeData(labels, data, batchSize=128,
-                                                                                          validSplit=0.2,
-                                                                                          mxVocab=20000, mxSentence=200)
-    embedFileName = os.path.join(os.getcwd(), "glove.6B", "glove.6B.50d.txt")
+    samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer = \
+        organizeData(labels, data, batchSize=128, validSplit=0.2,
+                     mxVocab=20000, mxSentence=200)
+    embedFileName = os.path.join(os.getcwd(), "glove.6B", f"glove.6B.{embedding_dim}d.txt")
+    print(f"Loading vector space with {embedding_dim} dimensions.")
     embedSpace = loadEmbedding(vectorizer, embedFileName)
     modelArch = designModel(embedSpace, len(classLabels), batchSize, vectorizer)
     modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer, modelArch)
