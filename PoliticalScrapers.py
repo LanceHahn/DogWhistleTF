@@ -2,6 +2,16 @@ from bs4 import BeautifulSoup
 import urllib.request
 
 import os
+import time
+import re
+
+# Function used is from ActiveState
+# https://code.activestate.com/recipes/81330-single-pass-multiple-replace/
+def multiple_replace(dict, text):
+    # Create a regular expression  from the dictionary keys
+    regex = re.compile("(%s)" % "|".join(map(re.escape, dict.keys())))
+    # For each match, look-up corresponding value in dictionary
+    return regex.sub(lambda mo: dict[mo.string[mo.start():mo.end()]], text)
 
 
 class Scraper:
@@ -81,18 +91,28 @@ class Scraper:
         return full_text
 
     def newsmax_n_articles(self, n: int) -> list:
-        page = urllib.request.urlopen("https://www.newsmax.com/")
+        page = urllib.request.urlopen("https://www.newsmax.com/archives/politics/1/2022/12/")
         soup = BeautifulSoup(page, "html.parser")
-        link = "https://www.newsmax.com" + soup.select("#nmCanvas6 h1 a.Default")[0]['href']
-
         texts = []
-        for _ in range(n):
-            page = urllib.request.urlopen(link)
+        month = 12
+        year = 2022
+        article_num = 0
+        while article_num < n:
+            links = soup.select("ul.archiveRepeaterUL li.archiveRepeaterLI h5.archiveH5 a")
+            for link in ("https://www.newsmax.com" + l['href'] for l in links):
+                try:
+                    texts.append(self.article_from_link(link))
+                except urllib.error.URLError:
+                    return texts
+                article_num += 1
+                if article_num >= n:
+                    break
+            month -= 1
+            if month == 0:
+                month = 12
+                year -= 1
+            page = urllib.request.urlopen(f"https://www.newsmax.com/archives/politics/1/{year}/{month}/")
             soup = BeautifulSoup(page, "html.parser")
-            texts.append(self.article_from_link(link))
-
-            next_page_link = soup.select("a.likeCommH2")[0]
-            link = "https://www.newsmax.com" + next_page_link['href']
         return texts
 
     def breitbart_from_link(self, link: str) -> str:
@@ -116,7 +136,10 @@ class Scraper:
         while article_num < n:
             articles = soup.select("section.aList.cf_show_classic article div h2 a")
             for link in (article['href'] for article in articles):
-                texts.append(self.article_from_link("https://www.breitbart.com" + link))
+                try:
+                    texts.append(self.article_from_link("https://www.breitbart.com" + link))
+                except urllib.error.URLError:
+                    return texts
                 article_num += 1
                 if article_num >= n:
                     break
@@ -139,8 +162,12 @@ class Scraper:
         }
 
         self.pages_accessed += 1
-
-        return function_dict[site](link)
+        try:
+            text = function_dict[site](link)
+        except urllib.error.URLError:
+            time.sleep(30)
+            text = function_dict[site](link)
+        return text
 
     def n_articles(self, link):
         site = link.rsplit("www.", 1)[1][:3]
@@ -152,7 +179,7 @@ class Scraper:
 
     def write_article(self, link, folder, name):
         os.mkdir(folder)
-        with open(os.path.join(os.getcwd(), folder, link.rsplit(".com/", 1)[1][:5] ), 'w') as f:
+        with open(os.path.join(os.getcwd(), folder, link.rsplit(".com/", 1)[1][:8]), 'w') as f:
             f.write(self.article_from_link(link))
 
     def create_dataset(self, folders: list, websites: list, n: int) -> None:
@@ -162,6 +189,26 @@ class Scraper:
             "sla": self.slate_n_articles,
             "bre": self.breitbart_n_articles
         }
+        replace_dict = {
+            "\\": "",
+            "\n": "",
+            "\b": "",
+            "!": "",
+            " ": "",
+            "/": "",
+            ".": "",
+            "_": "",
+            "-": "",
+            "*": "",
+            '"': "",
+            "[": "",
+            "]": "",
+            ":": "",
+            ";": "",
+            "|": "",
+            ",": ""
+        }
+
         for folder, website in zip(folders, websites):
             cnt = 1
             directory = os.path.join(os.getcwd(), folder)
@@ -170,11 +217,12 @@ class Scraper:
             func = function_dict[website]
             articles = func(n)
             for article in articles:
-                with open(os.path.join(directory, article.replace(" ", "").lower()[:8] + str(cnt) + ".txt"), 'w', errors='ignore', encoding='utf-8') as f:
+                title = multiple_replace(replace_dict, article[:10]) + str(cnt) + ".txt"
+                with open(os.path.join(directory, title), 'w', errors='ignore', encoding='utf-8') as f:
                     f.write(article)
                 cnt += 1
     
 
 if __name__ == "__main__":
     test = Scraper()
-    test.create_dataset(['slate'], ['sla'], 17)
+    test.create_dataset(['newsmax', 'breitbart', 'slate'], ['new', 'bre', 'sla'], 50)
