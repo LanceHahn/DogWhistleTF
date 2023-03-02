@@ -72,7 +72,7 @@ def acquireData(dataDir):
             lines = content.split("\n")
             if HEADER:
                 lines = lines[10:]  # skip header info in message
-            content = "\n".join(lines)  # recombine msg as single string
+            content = "\n".join(lines).lower()  # recombine msg as single string
             samples.append(content)  # list of training strings/documents
             labels.append(class_index)   # label index associated with text
         print(f"{dirname} class:  {len(fnames)} samples available and {IX + 1} used.")
@@ -196,6 +196,8 @@ def designModel(embedMatrix, classCount, batchSize, vectorizer):
     x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
     x = layers.MaxPooling1D(windowSz)(x)
     x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
+    # x = layers.MaxPooling1D(windowSz)(x)
+    # x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
     x = layers.GlobalMaxPooling1D()(x)
     x = layers.Dense(batchSize, activation="relu")(x)
     x = layers.Dropout(dropProb)(x)
@@ -230,17 +232,22 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer, model
 
 def useModel(model, classLabels):
 
-    testText = "this message is about computer graphics and 3D modeling"
+    testText = "this message is about computer graphics and 3D modeling".lower()
     probabilities = model.predict([[testText]])
     print(f"'{testText}' -> {classLabels[np.argmax(probabilities[0])]}")
     print("Enter QUIT to stop being prompted for a phrase.")
-    while testText.lower() != 'quit':
-        testText = input("Phrase to categorize: ")
+    while testText != 'quit':
+        testText = input("Phrase to categorize: ").lower()
         probabilities = model.predict([[testText]])
         bestProbIX = np.argmax(probabilities[0])
         bestClass = classLabels[bestProbIX]
         print(f"'{testText}' is most associated with class '{bestClass}' with weight "
               f"{probabilities[0][bestProbIX]}")
+        # [print(f"{classLabels[ix]}: {probabilities[0][ix]} ")
+        #  for ix in range(len(classLabels)) if ix != bestProbIX]
+        print(f"{','.join(f'{classLabels[ix]}: {probabilities[0][ix]}' for ix in range(len(classLabels)) if ix != bestProbIX)}")
+
+
     return
 
 
