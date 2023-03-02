@@ -12,6 +12,7 @@ from keras.layers import TextVectorization
 import os
 import pathlib
 
+HEADER = False
 
 def findSampleMax(data_dir, dirnames):
     maxClassSample = 0
@@ -69,7 +70,8 @@ def acquireData(dataDir):
             f = open(fpath, encoding="latin-1")
             content = f.read()
             lines = content.split("\n")
-            lines = lines[10:]  # skip header info in message
+            if HEADER:
+                lines = lines[10:]  # skip header info in message
             content = "\n".join(lines)  # recombine msg as single string
             samples.append(content)  # list of training strings/documents
             labels.append(class_index)   # label index associated with text
@@ -103,7 +105,8 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
 
     # Extract a training & validation split
     num_validation_samples = int(validSplit * len(samples))
-    print(f"{validSplit} of dataset of total {len(samples)} is separated into {len(samples)-num_validation_samples} training samples and"
+    print(f"{validSplit} of dataset of total {len(samples)} is separated into "
+          f"{len(samples)-num_validation_samples} training samples and"
           f" {num_validation_samples} validation samples.")
     train_samples = samples[:-num_validation_samples]
     val_samples = samples[-num_validation_samples:]
@@ -115,7 +118,7 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
     print(f"Vocabulary is the top {mxVocab} words.")
     print(f"The training sample will be processed in batches containing {batchSize} values.")
 
-    print(f"Training vectors are {mxSentence}-dim representing single sentences.")
+    print(f"Training vectors are {mxSentence} in length, representing single sentences.")
     vectorizer = TextVectorization(max_tokens=mxVocab, output_sequence_length=mxSentence)
     text_ds = tf.data.Dataset.from_tensor_slices(train_samples).batch(batchSize)
     vectorizer.adapt(text_ds)
@@ -133,7 +136,7 @@ def loadEmbedding(vectorizer, embedFile):
     voc = vectorizer.get_vocabulary()
     word_index = dict(zip(voc, range(len(voc))))
 
-    print(f"Begin acquiring embedding vectors from {embedFile}")
+    print(f"Begin acquiring embedding vectpors from {embedFile}")
     #C:\Users\drlwh\OneDrive\Documents\GitHub\DogWhistleTF\glove.6B
     embeddings_index = {}
     with open(embedFile, encoding="utf8") as f:
@@ -212,9 +215,11 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer, model
     y_val = np.array(validLabels)
 
     model.compile(
-        loss="sparse_categorical_crossentropy", optimizer="rmsprop", metrics=["acc"]
+        loss="sparse_categorical_crossentropy", optimizer="rmsprop",
+        metrics=["acc"]
     )
-    model.fit(x_train, y_train, batch_size=128, epochs=20, validation_data=(x_val, y_val))
+    model.fit(x_train, y_train, batch_size=128, epochs=20,
+              validation_data=(x_val, y_val))
     string_input = keras.Input(shape=(1,), dtype="string")
     x = vectorizer(string_input)
     preds = model(x)
