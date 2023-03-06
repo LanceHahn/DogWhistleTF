@@ -4,7 +4,9 @@ https://keras.io/examples/nlp/pretrained_word_embeddings/
 """
 
 import numpy as np
+
 import tensorflow as tf
+tf.get_logger().setLevel('INFO')
 from tensorflow import keras
 from keras import layers
 from keras.layers import TextVectorization
