@@ -14,6 +14,20 @@ from keras.layers import TextVectorization
 import os
 import pathlib
 
+HEADER = False
+
+def findSampleMax(data_dir, dirnames):
+    maxClassSample = 0
+    classCounts = {}
+    for dirname in sorted(dirnames):
+        fnames = os.listdir(data_dir / dirname)
+        classCounts[dirname] = len(fnames)
+        if maxClassSample == 0:
+            maxClassSample = len(fnames)
+        elif maxClassSample > len(fnames):
+            maxClassSample = len(fnames)
+
+    return maxClassSample
 
 def acquireData(dataDir):
     """
@@ -24,38 +38,46 @@ def acquireData(dataDir):
     """
     print(f"Reading in training and testing data from {dataDir}")
     dirnames = os.listdir(dataDir)
+    dirnames = sorted([x for x in dirnames if '.DS_Store' != x])
     print("We've created an access point to some newsgroup data. \nSummary Info:")
     print("Number of directories:", len(dirnames))
     print("Directory names:", dirnames)
 
-    fnames = os.listdir(dataDir / "comp.graphics")
-    print("As an example, here are the number of files in one directory named `comp.graphics`:", len(fnames))
-    print("Some example filenames from 'comp.graphics':", fnames[:5])
+    sampleDir = dirnames[0]
+    fnames = os.listdir(dataDir / sampleDir)
+    print(f"As an example, here are the number of files in one directory named `{sampleDir}`:", len(fnames))
+    print(f"Some example filenames from '{sampleDir}':", fnames[:5])
 
-    sampleFile = dataDir / "comp.graphics" / "38987"
+    sampleFile = dataDir / sampleDir / fnames[0]
     print(f"\nA sample file ({sampleFile}) contents:")
-    print(open(dataDir / "comp.graphics" / "38987").read())
+    print(open(dataDir / sampleDir / fnames[0]).read())
     print("Acquiring data as a list of document strings and a list of labels associated with the strings.")
     print("The class name is the source discussion board and the label is the index")
     samples = []
     labels = []
     class_names = []
     class_index = 0
-    for dirname in sorted(os.listdir(data_dir)):
+    maxClassSample = findSampleMax(data_dir, dirnames)
+    for dirname in sorted(dirnames):
         class_names.append(dirname)
         dirpath = data_dir / dirname
         fnames = os.listdir(dirpath)
         print(f"Processing directory {dirname}, {len(fnames)} files will be associated "
               f"with the label {dirname}")
-        for fname in fnames:
+        for IX, fname in enumerate(fnames):
+            if IX >= maxClassSample:
+                IX = IX -1
+                break
             fpath = dirpath / fname
             f = open(fpath, encoding="latin-1")
             content = f.read()
             lines = content.split("\n")
-            lines = lines[10:]  # skip header info in message
-            content = "\n".join(lines)  # recombine msg as single string
+            if HEADER:
+                lines = lines[10:]  # skip header info in message
+            content = "\n".join(lines).lower()  # recombine msg as single string
             samples.append(content)  # list of training strings/documents
             labels.append(class_index)   # label index associated with text
+        print(f"{dirname} class:  {len(fnames)} samples available and {IX + 1} used.")
         class_index += 1
     print(f"Classes ({len(class_names)}):", class_names)
     print("Number of samples:", len(samples))
@@ -85,7 +107,8 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
 
     # Extract a training & validation split
     num_validation_samples = int(validSplit * len(samples))
-    print(f"{validSplit} of dataset of {len(samples)} is divided into {len(samples)-num_validation_samples} training samples and"
+    print(f"{validSplit} of dataset of total {len(samples)} is separated into "
+          f"{len(samples)-num_validation_samples} training samples and"
           f" {num_validation_samples} validation samples.")
     train_samples = samples[:-num_validation_samples]
     val_samples = samples[-num_validation_samples:]
@@ -97,7 +120,7 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
     print(f"Vocabulary is the top {mxVocab} words.")
     print(f"The training sample will be processed in batches containing {batchSize} values.")
 
-    print(f"Training vectors are {mxSentence}-dim representing single sentences.")
+    print(f"Training vectors are {mxSentence} in length, representing single sentences.")
     vectorizer = TextVectorization(max_tokens=mxVocab, output_sequence_length=mxSentence)
     text_ds = tf.data.Dataset.from_tensor_slices(train_samples).batch(batchSize)
     vectorizer.adapt(text_ds)
@@ -115,7 +138,7 @@ def loadEmbedding(vectorizer, embedFile):
     voc = vectorizer.get_vocabulary()
     word_index = dict(zip(voc, range(len(voc))))
 
-    print(f"Begin acquiring embedding vectors from {embedFile}")
+    print(f"Begin acquiring embedding vectpors from {embedFile}")
     #C:\Users\drlwh\OneDrive\Documents\GitHub\DogWhistleTF\glove.6B
     embeddings_index = {}
     with open(embedFile, encoding="utf8") as f:
@@ -175,6 +198,8 @@ def designModel(embedMatrix, classCount, batchSize, vectorizer):
     x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
     x = layers.MaxPooling1D(windowSz)(x)
     x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
+    # x = layers.MaxPooling1D(windowSz)(x)
+    # x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
     x = layers.GlobalMaxPooling1D()(x)
     x = layers.Dense(batchSize, activation="relu")(x)
     x = layers.Dropout(dropProb)(x)
@@ -194,9 +219,11 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer, model
     y_val = np.array(validLabels)
 
     model.compile(
-        loss="sparse_categorical_crossentropy", optimizer="rmsprop", metrics=["acc"]
+        loss="sparse_categorical_crossentropy", optimizer="rmsprop",
+        metrics=["acc"]
     )
-    model.fit(x_train, y_train, batch_size=128, epochs=20, validation_data=(x_val, y_val))
+    model.fit(x_train, y_train, batch_size=128, epochs=20,
+              validation_data=(x_val, y_val))
     string_input = keras.Input(shape=(1,), dtype="string")
     x = vectorizer(string_input)
     preds = model(x)
@@ -207,37 +234,53 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer, model
 
 def useModel(model, classLabels):
 
-    testText = "this message is about computer graphics and 3D modeling"
+    testText = "this message is about computer graphics and 3D modeling".lower()
     probabilities = model.predict([[testText]])
     print(f"'{testText}' -> {classLabels[np.argmax(probabilities[0])]}")
     print("Enter QUIT to stop being prompted for a phrase.")
-    while testText.lower() != 'quit':
-        testText = input("Phrase to categorize: ")
+    while testText != 'quit':
+        testText = input("Phrase to categorize: ").lower()
         probabilities = model.predict([[testText]])
         bestProbIX = np.argmax(probabilities[0])
         bestClass = classLabels[bestProbIX]
         print(f"'{testText}' is most associated with class '{bestClass}' with weight "
               f"{probabilities[0][bestProbIX]}")
+        # [print(f"{classLabels[ix]}: {probabilities[0][ix]} ")
+        #  for ix in range(len(classLabels)) if ix != bestProbIX]
+        print(f"{','.join(f'{classLabels[ix]}: {probabilities[0][ix]}' for ix in range(len(classLabels)) if ix != bestProbIX)}")
+
+
     return
 
 
 if __name__ == '__main__':
-    embedding_dim = 50
+    embedding_dim = 300
     batchSize = 128
-    data_path = keras.utils.get_file(
-        "news20.tar.gz",
-        "http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-20/www/data/news20.tar.gz",
-        untar=True,
-    )
-    data_dir = pathlib.Path(data_path).parent / "20_newsgroup"
+    dataSource = ['local', "news"][0]
+    if dataSource == "news":
+        # news groups
+        data_path = keras.utils.get_file(
+            "news20.tar.gz",
+            "http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-20/www/data/news20.tar.gz",
+            untar=True,
+        )
+        data_dir = pathlib.Path(data_path).parent / "20_newsgroup"
+    else:
+        # local data
+        data_dir = pathlib.Path("data")
+
+    dirnames = os.listdir(data_dir)
+    dirnames = sorted([x for x in dirnames if '.DS_Store' != x])
     labels, data = acquireData(data_dir)
-    classLabels = [dirname for dirname in sorted(os.listdir(data_dir))]
+
+    classLabels = dirnames.copy()
     classCount = len(list(set(labels)))
 
-    samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer = organizeData(labels, data, batchSize=128,
-                                                                                          validSplit=0.2,
-                                                                                          mxVocab=20000, mxSentence=200)
-    embedFileName = os.path.join(os.getcwd(), "glove.6B", "glove.6B.50d.txt")
+    samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer = \
+        organizeData(labels, data, batchSize=128, validSplit=0.2,
+                     mxVocab=20000, mxSentence=200)
+    embedFileName = os.path.join(os.getcwd(), "glove.6B", f"glove.6B.{embedding_dim}d.txt")
+    print(f"Loading vector space with {embedding_dim} dimensions.")
     embedSpace = loadEmbedding(vectorizer, embedFileName)
     modelArch = designModel(embedSpace, len(classLabels), batchSize, vectorizer)
     modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer, modelArch)
