@@ -9,22 +9,35 @@ from tensorflow import keras
 from keras import layers
 from keras.layers import TextVectorization
 
+from statistics import mean, median
 import os
 import pathlib
 
 HEADER = False
+dataFocus = ('document', 'sentence', 'line')[2]
 
 def findSampleMax(data_dir, dirnames):
     maxClassSample = 0
-    classCounts = {}
     for dirname in sorted(dirnames):
         fnames = os.listdir(data_dir / dirname)
-        classCounts[dirname] = len(fnames)
+        if dataFocus == 'document':
+            metric = len(fnames)
+        elif dataFocus == 'line':
+            lineCount = 0
+            for fName in fnames:
+                f = open(os.path.join(os.getcwd(), data_dir, dirname, fName), encoding="latin-1")
+                content = f.read()
+                lines = content.replace('.', '\n').split("\n")
+                lineCount += len(lines)
+            metric = lineCount
+        else:
+            print(f"findSampleMax(): ERROR - Unintelligible or unimplemented dataFocus {dataFocus}")
+            exit()
         if maxClassSample == 0:
-            maxClassSample = len(fnames)
-        elif maxClassSample > len(fnames):
-            maxClassSample = len(fnames)
-
+            maxClassSample = metric
+        elif maxClassSample > metric:
+            maxClassSample = metric
+        print(f"findSampleMax with {dataFocus} focus: {dirname}: {metric}")
     return maxClassSample
 
 def acquireData(dataDir):
@@ -34,12 +47,12 @@ def acquireData(dataDir):
     the subdirectory is treated as the label and the documents are sample data
     :return: list of labels, list of data
     """
+    DBName = 'NorthAmer273.txt'
     print(f"Reading in training and testing data from {dataDir}")
     dirnames = os.listdir(dataDir)
     dirnames = sorted([x for x in dirnames if '.DS_Store' != x])
-    print("We've created an access point to some newsgroup data. \nSummary Info:")
-    print("Number of directories:", len(dirnames))
-    print("Directory names:", dirnames)
+    print("Summary Info:")
+    print(f"{len(dirnames)} Directory names: {dirnames}")
 
     sampleDir = dirnames[0]
     fnames = os.listdir(dataDir / sampleDir)
@@ -62,27 +75,44 @@ def acquireData(dataDir):
         fnames = os.listdir(dirpath)
         print(f"Processing directory {dirname}, {len(fnames)} files will be associated "
               f"with the label {dirname}")
+        print(f"Data will be processed at the *{dataFocus}* level of analysis")
+        sampleCount = 0
         for IX, fname in enumerate(fnames):
-            if IX >= maxClassSample:
+            if DBName == fname:
+                print(f"here {DBName}")
+            #if IX >= maxClassSample:
+            if sampleCount >= maxClassSample:
                 IX = IX -1
                 break
             fpath = dirpath / fname
             f = open(fpath, encoding="latin-1")
             content = f.read()
-            lines = content.split("\n")
+            lines = content.replace('.', '\n').split("\n")
             if HEADER:
                 lines = lines[10:]  # skip header info in message
-            content = "\n".join(lines).lower()  # recombine msg as single string
-            samples.append(content)  # list of training strings/documents
-            labels.append(class_index)   # label index associated with text
-        print(f"{dirname} class:  {len(fnames)} samples available and {IX + 1} used.")
+            if dataFocus == 'document':
+                content = "\n".join(lines).lower()  # recombine msg as single string
+                samples.append(content)  # list of training strings/documents
+                labels.append(class_index)   # label index associated with text
+                sampleCount += 1
+            elif dataFocus == 'line':
+                for content in lines:
+                    if sampleCount < maxClassSample:
+                        samples.append(content)  # list of training strings/documents
+                        labels.append(class_index)   # label index associated with text
+                        sampleCount += 1
+            else:
+                print(f"acquireData(): ERROR - Unintelligible or unimplemented dataFocus {dataFocus}")
+                exit()
+        print(f"{dirname} class from {len(fnames)} files:  {sampleCount} samples used and {IX + 1} files used.")
         class_index += 1
     print(f"Classes ({len(class_names)}):", class_names)
     print("Number of samples:", len(samples))
     return labels, samples
 
 
-def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, mxSentence=200):
+def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000,
+                 mxSentence=200):
     """
     Break the data into a training set and a validation set.  Also create
     a vectorizer that can be used to convert a string into a list of indexes which
@@ -112,8 +142,19 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
     val_samples = samples[-num_validation_samples:]
     train_labels = labels[:-num_validation_samples]
     val_labels = labels[-num_validation_samples:]
-    print(f"{len(train_samples)} training samples")
-    print(f"{len(val_labels)} validation samples")
+
+    trainWC = [len(samp.split(' ')) for samp in train_samples]
+    tooLong = sum(1 if x > mxSentence else 0 for x in trainWC)
+    print(f"{len(train_samples)} training samples word count range "
+          f"{min(trainWC)}:{max(trainWC)}, ave: {mean(trainWC)}, med:{median(trainWC)}")
+    print(f"{tooLong} ({tooLong/len(trainWC)}) of the training phrases were "
+          f"truncated by using threshold of {mxSentence}.")
+    valWC = [len(samp.split(' ')) for samp in val_samples]
+    tooLong = sum(1 if x > mxSentence else 0 for x in valWC)
+    print(f"{len(valWC)} validation samples word count range "
+          f"{min(valWC)}:{max(valWC)}, ave: {mean(valWC)}, med:{median(valWC)}")
+    print(f"{tooLong} ({tooLong/len(valWC)}) of the validation phrases were "
+          f"truncated by using threshold of {mxSentence}.")
     print(f"Vector representing a sentence is at most {mxSentence} tokens long.")
     print(f"Vocabulary is the top {mxVocab} words.")
     print(f"The training sample will be processed in batches containing {batchSize} values.")
@@ -126,7 +167,8 @@ def organizeData(labels, samples, batchSize=128, validSplit=0.2, mxVocab=20000, 
     print(f"The top 5 words in vectorization: {vectorizer.get_vocabulary()[:5]}")
     sampleText = "the cat sat on the mat"
     output = vectorizer([[sampleText]])
-    print(f"The sentence '{sampleText}' converts into a vector of {len(output[0])} token indexes that is padded with 0s of:"
+    print(f"The sentence '{sampleText}' converts into a vector of {len(output[0])} "
+          f"token indexes that is padded with 0s of:"
           f"{output.numpy()[0, :6]}")
     return train_samples, train_labels, val_samples, val_labels, vectorizer
 
@@ -136,7 +178,7 @@ def loadEmbedding(vectorizer, embedFile):
     voc = vectorizer.get_vocabulary()
     word_index = dict(zip(voc, range(len(voc))))
 
-    print(f"Begin acquiring embedding vectpors from {embedFile}")
+    print(f"Begin acquiring embedding vectors from {embedFile}")
     #C:\Users\drlwh\OneDrive\Documents\GitHub\DogWhistleTF\glove.6B
     embeddings_index = {}
     with open(embedFile, encoding="utf8") as f:
@@ -162,6 +204,7 @@ def loadEmbedding(vectorizer, embedFile):
         else:
             misses += 1
             missed.add(word)
+    print(f"'radar': {voc.index('radar')} 'anomaly': {voc.index('anomaly')}")
     print("Converted %d words (%d misses)" % (hits, misses))
     print("'misses' are words that didn't make it into our embedding space.")
     print(f"Full list of misses: {missed}")
@@ -196,8 +239,8 @@ def designModel(embedMatrix, classCount, batchSize, vectorizer):
     x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
     x = layers.MaxPooling1D(windowSz)(x)
     x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
-    # x = layers.MaxPooling1D(windowSz)(x)
-    # x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
+    x = layers.MaxPooling1D(windowSz)(x)
+    x = layers.Conv1D(batchSize, windowSz, activation="relu")(x)
     x = layers.GlobalMaxPooling1D()(x)
     x = layers.Dense(batchSize, activation="relu")(x)
     x = layers.Dropout(dropProb)(x)
@@ -208,7 +251,8 @@ def designModel(embedMatrix, classCount, batchSize, vectorizer):
     return model
 
 
-def trainModel(trainData, trainLabels, validData, validLabels, vectorizer, model):
+def trainModel(trainData, trainLabels, validData, validLabels, vectorizer,
+               model, batchSize=128, epochs=20):
 
     x_train = vectorizer(np.array([[s] for s in trainData])).numpy()
     x_val = vectorizer(np.array([[s] for s in validData])).numpy()
@@ -220,7 +264,7 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer, model
         loss="sparse_categorical_crossentropy", optimizer="rmsprop",
         metrics=["acc"]
     )
-    model.fit(x_train, y_train, batch_size=128, epochs=20,
+    model.fit(x_train, y_train, batch_size=batchSize, epochs=epochs,
               validation_data=(x_val, y_val))
     string_input = keras.Input(shape=(1,), dtype="string")
     x = vectorizer(string_input)
@@ -229,10 +273,39 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer, model
 
     return end_to_end_model
 
+def testModel(testFileName, modelTrained, classLabels):
+    contents = open(testFileName).readlines()
+    results = []
+    for con in contents:
+        label, text = con.rstrip().split(',', 1)
+        probabilities = modelTrained.predict([[text]])
+        result = {
+            'probe': text,
+            'expected label': label,
+            'predicted label': classLabels[np.argmax(probabilities[0])],
+            'probabilities':
+                {classLabels[ix]: probabilities[0][ix]
+                 for ix in range(len(classLabels))
+                 }
+        }
+        results.append(result)
+    return results
+
+def showResults(results):
+    print(f"expected label,predicted label,probabilities,probe")
+    for res in results:
+        print(f"{res['expected label']},{res['predicted label']},{res['probabilities']},{res['probe']}")
+    return
 
 def useModel(model, classLabels):
 
     testText = "this message is about computer graphics and 3D modeling".lower()
+    probabilities = model.predict([[testText]])
+    print(f"'{testText}' -> {classLabels[np.argmax(probabilities[0])]}")
+    testText = "radar anomaly".lower()
+    probabilities = model.predict([[testText]])
+    print(f"'{testText}' -> {classLabels[np.argmax(probabilities[0])]}")
+    testText = "welfare should be replaced by religious charities".lower()
     probabilities = model.predict([[testText]])
     print(f"'{testText}' -> {classLabels[np.argmax(probabilities[0])]}")
     print("Enter QUIT to stop being prompted for a phrase.")
@@ -243,8 +316,6 @@ def useModel(model, classLabels):
         bestClass = classLabels[bestProbIX]
         print(f"'{testText}' is most associated with class '{bestClass}' with weight "
               f"{probabilities[0][bestProbIX]}")
-        # [print(f"{classLabels[ix]}: {probabilities[0][ix]} ")
-        #  for ix in range(len(classLabels)) if ix != bestProbIX]
         print(f"{','.join(f'{classLabels[ix]}: {probabilities[0][ix]}' for ix in range(len(classLabels)) if ix != bestProbIX)}")
 
 
@@ -254,6 +325,8 @@ def useModel(model, classLabels):
 if __name__ == '__main__':
     embedding_dim = 300
     batchSize = 128
+    epochs = 20
+    mxSentence = 750 # good: 750 800 900 1000  # bad: 740 720 700 600, 500, 100
     dataSource = ['local', "news"][0]
     if dataSource == "news":
         # news groups
@@ -275,11 +348,16 @@ if __name__ == '__main__':
     classCount = len(list(set(labels)))
 
     samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer = \
-        organizeData(labels, data, batchSize=128, validSplit=0.2,
-                     mxVocab=20000, mxSentence=200)
+        organizeData(labels, data, batchSize=batchSize, validSplit=0.2,
+                     mxVocab=20000, mxSentence=mxSentence)
     embedFileName = os.path.join(os.getcwd(), "glove.6B", f"glove.6B.{embedding_dim}d.txt")
     print(f"Loading vector space with {embedding_dim} dimensions.")
     embedSpace = loadEmbedding(vectorizer, embedFileName)
     modelArch = designModel(embedSpace, len(classLabels), batchSize, vectorizer)
-    modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer, modelArch)
+    modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate,
+                              labelsValidate, vectorizer, modelArch,
+                              batchSize=batchSize, epochs=epochs)
+    testFileName = "/Users/lance/Documents/GitHub/DogWhistleTF/testProbes.txt"
+    results = testModel(testFileName, modelTrained, classLabels)
+    showResults(results)
     useModel(modelTrained, classLabels)
