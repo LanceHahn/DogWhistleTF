@@ -8,11 +8,13 @@ import tensorflow as tf
 from tensorflow import keras
 from keras import layers
 from keras.layers import TextVectorization
-
+from keras.layers import Embedding
+from keras.models import load_model
 from statistics import mean, median
 import os
 import pathlib
-
+from datetime import datetime as dt
+import json
 HEADER = False
 dataFocus = ('document', 'sentence', 'line')[2]
 
@@ -204,7 +206,7 @@ def loadEmbedding(vectorizer, embedFile):
         else:
             misses += 1
             missed.add(word)
-    print(f"'radar': {voc.index('radar')} 'anomaly': {voc.index('anomaly')}")
+#    print(f"'radar': {voc.index('radar')} 'anomaly': {voc.index('anomaly')}")
     print("Converted %d words (%d misses)" % (hits, misses))
     print("'misses' are words that didn't make it into our embedding space.")
     print(f"Full list of misses: {missed}")
@@ -214,7 +216,7 @@ def loadEmbedding(vectorizer, embedFile):
 def designModel(embedMatrix, classCount, batchSize, vectorizer):
     # Create the keras embedding layer and initialize it using our acquired embedding vectors
     #from tensorflow.keras.layers import Embedding
-    from keras.layers import Embedding
+
     voc = vectorizer.get_vocabulary()
     num_tokens = len(voc) + 2
     embedding_layer = Embedding(
@@ -227,10 +229,9 @@ def designModel(embedMatrix, classCount, batchSize, vectorizer):
     # A simple 1D convnet with global max pooling and a classifier at the end.
     windowSz = 5
     dropProb = 0.5
-    print(f"A 3-layer Conv1D with {batchSize} input vectors having window size of {windowSz} ")
+    print(f"A 4-layer Conv1D with {batchSize} input vectors having window size of {windowSz} ")
     print("Global Max pooling looks across the input vector and takes the single largest value")
     print(f"A Dropout layer with dropout probability of {dropProb} is near the end of the model.")
-
 
     int_sequences_input = keras.Input(shape=(None,), dtype="int64")
     embedded_sequences = embedding_layer(int_sequences_input)
@@ -273,7 +274,16 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer,
 
     return end_to_end_model
 
+# ADD DETECTION OF WORDS THAT AREN'T IN THE VOCABULARY
 def testModel(testFileName, modelTrained, classLabels):
+    """
+    run the model on the contents of a test file that contains
+    label, probe text pairs.
+    :param testFileName: name of file with label, probe text
+    :param modelTrained: model
+    :param classLabels: class labels
+    :return:  list of dict describing each result
+    """
     contents = open(testFileName).readlines()
     results = []
     for con in contents:
@@ -286,18 +296,44 @@ def testModel(testFileName, modelTrained, classLabels):
             'probabilities':
                 {classLabels[ix]: probabilities[0][ix]
                  for ix in range(len(classLabels))
-                 }
+                 },
+            'correct': 1 if label == classLabels[np.argmax(probabilities[0])] else 0
         }
         results.append(result)
     return results
 
 def showResults(results):
-    print(f"expected label,predicted label,probabilities,probe")
+    """
+    display a list of results
+    :param results: list of dicts with each dict describing the model product
+    from a text probe
+    :return:
+    """
+    probKeys = results[0]['probabilities'].keys()
+
+    print(f"expected label,predicted label,{[' prob, '.join(probKeys)]} prob,probe")
+    summary = dict()
     for res in results:
-        print(f"{res['expected label']},{res['predicted label']},{res['probabilities']},{res['probe']}")
+        print(f"{res['expected label']},{res['predicted label']},"
+              f"{','.join([str(res['probabilities'][k]) for k in probKeys])},{res['probe']}")
+        if res['expected label'] in summary.keys():
+            summary[res['expected label']].append(res['correct'])
+        else:
+            summary[res['expected label']] = [res['correct']]
+    print('label,correct,incorrect,total')
+    for k in summary.keys():
+        print(f"{k},{sum(summary[k])},{len(summary[k])-sum(summary[k])},"
+              f"{len(summary[k])}")
     return
 
+
 def useModel(model, classLabels):
+    """
+    User interaction with the text model
+    :param model:  trained model
+    :param classLabels: list of class labels
+    :return:
+    """
 
     testText = "this message is about computer graphics and 3D modeling".lower()
     probabilities = model.predict([[testText]])
@@ -317,16 +353,41 @@ def useModel(model, classLabels):
         print(f"'{testText}' is most associated with class '{bestClass}' with weight "
               f"{probabilities[0][bestProbIX]}")
         print(f"{','.join(f'{classLabels[ix]}: {probabilities[0][ix]}' for ix in range(len(classLabels)) if ix != bestProbIX)}")
+    return
 
-
+def saveModel(model, params, fName):
+    """
+    save the parameters of the model to a JSON and and a copy of the model
+    :param model: trained model
+    :param params: training parameters
+    :param fName: name to write model to
+    :return:
+    """
+    print(f"Saving parameters in {modelFileName}.json")
+    print(f"Saving model in {modelFileName}.xx")
+    with open(f'{modelFileName}.json', 'w', encoding='utf-8') as f:
+        json.dump(params, f, indent=4)
+    model.save(fName)
     return
 
 
+def loadModel(fName):
+    """
+    load a pre-trained model
+    NOT TESTED YET
+    :param fName:
+    :return:
+    """
+    model = load_model(fName)
+    return model
+
 if __name__ == '__main__':
+    startTime = dt.now()
     embedding_dim = 300
     batchSize = 128
-    epochs = 20
-    mxSentence = 750 # good: 750 800 900 1000  # bad: 740 720 700 600, 500, 100
+    epochs = 40
+    mxSentence = 750  # good: 750 800 900 1000  # bad: 740 720 700 600, 500, 100
+    mxVocab = 20000
     dataSource = ['local', "news"][0]
     if dataSource == "news":
         # news groups
@@ -349,7 +410,7 @@ if __name__ == '__main__':
 
     samplesTrain, labelsTrain, samplesValidate, labelsValidate, vectorizer = \
         organizeData(labels, data, batchSize=batchSize, validSplit=0.2,
-                     mxVocab=20000, mxSentence=mxSentence)
+                     mxVocab=mxVocab, mxSentence=mxSentence)
     embedFileName = os.path.join(os.getcwd(), "glove.6B", f"glove.6B.{embedding_dim}d.txt")
     print(f"Loading vector space with {embedding_dim} dimensions.")
     embedSpace = loadEmbedding(vectorizer, embedFileName)
@@ -360,4 +421,31 @@ if __name__ == '__main__':
     testFileName = "/Users/lance/Documents/GitHub/DogWhistleTF/testProbes.txt"
     results = testModel(testFileName, modelTrained, classLabels)
     showResults(results)
+
+    modelTime = dt.now().isoformat()[:19].replace(':', '_')
+    modelFileName = f"model_{modelTime}"
+    endTime = dt.now()
+    # add test probe results
+    params = {
+        'modelFileName': modelFileName,
+        'embedding_dim': embedding_dim,
+        'batchSize': batchSize,
+        'mxSentence': mxSentence,
+        'mxVocab': mxVocab,
+        'epochs': epochs,
+        'dataSource': dataSource,
+        'classCount': classCount,
+        'classes': list(set(labels)),
+        'embedFileName': embedFileName,
+        'testFileName': testFileName,
+        'startTime': str(startTime),
+        'endTime': str(endTime),
+        'duration (s)': (endTime-startTime).total_seconds()
+    }
+    saveModel(modelTrained, params, modelFileName)
+
     useModel(modelTrained, classLabels)
+
+    newModel = loadModel(modelFileName)
+    retestResults = testModel(testFileName, newModel, classLabels)
+    showResults(results)
