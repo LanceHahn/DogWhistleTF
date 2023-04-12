@@ -1,13 +1,13 @@
-rightWing,Illegal immigration/immigrants
-rightWing,US has open borders
-rightWing,Far-left extremists
-rightWing,Critical Race Theory (CRT) in schools
+rightWing,illegals crossing the border
+rightWing,america has open borders
+rightWing,Far left extremists
+rightWing,Critical Race theory in schools
 rightWing,Welfare is a drain on system
 rightWing,Sleepy Joe
 rightWing,Socialist politicians
 rightWing,Biden should be impeached
 rightWing,Make America Great Again
-rightWing,The 2020 election being/was stolen
+rightWing,The 2020 election was stolen
 neutral,Equality is a core American value
 neutral,Traditional American values
 neutral,Bureaucratic interests
@@ -16,25 +16,25 @@ neutral,Real American
 neutral,Globalist interests
 neutral,America is the greatest country
 neutral,America is not the greatest country
-neutral,Jan 6 riots
+neutral,january 6 riots
 neutral,American politics is becoming more radical
-neutral,The US is a democracy
+neutral,america is a democracy
 neutral,The sky is blue
 neutral,Equality is important
 neutral,Crime is a problem
-neutral,The US is a large nation
+neutral,america is a large nation
 neutral,Lies in the media
 neutral,Fear of recession
 neutral,Financial insecurity
 neutral,Politics is boring
-neutral,The US has a large debt
-leftWing,Far-right extremists
+neutral,america has a large debt
+leftWing,Far right extremists
 leftWing,Injustices of capitalism
 leftWing,Health care is a right
-leftWing,McCarthyism or McCarthy-like
-leftWing,Republicans are transphobic/racist/etc
+leftWing,accused of subversion
+leftWing,Republicans are racist
 leftWing,Western imperialism
 leftWing,Trump damaged America.
 leftWing,Republicans are becoming more radical.
-leftWing,MAGA Republicans
-leftWing,The US needs a stronger social safety net
+leftWing,Wall Street Republicans
+leftWing,america needs a stronger social safety net
