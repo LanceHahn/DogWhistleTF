@@ -87,7 +87,7 @@ def acquireData(dataDir):
                 IX = IX -1
                 break
             fpath = dirpath / fname
-            f = open(fpath, encoding="latin-1")
+            f = open(fpath, encoding="latin-1", errors='ignore')
             content = f.read()
             lines = content.replace('.', '\n').split("\n")
             if HEADER:
@@ -275,7 +275,7 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer,
     return end_to_end_model
 
 # ADD DETECTION OF WORDS THAT AREN'T IN THE VOCABULARY
-def testModel(testFileName, modelTrained, classLabels):
+def testModel(testFileName, modelTrained, classLabels, vectorizer):
     """
     run the model on the contents of a test file that contains
     label, probe text pairs.
@@ -286,8 +286,10 @@ def testModel(testFileName, modelTrained, classLabels):
     """
     contents = open(testFileName).readlines()
     results = []
+    voc = vectorizer.get_vocabulary(include_special_tokens=False)
     for con in contents:
         label, text = con.rstrip().split(',', 1)
+
         probabilities = modelTrained.predict([[text]])
         result = {
             'probe': text,
@@ -419,7 +421,7 @@ if __name__ == '__main__':
                               labelsValidate, vectorizer, modelArch,
                               batchSize=batchSize, epochs=epochs)
     testFileName = "/Users/lance/Documents/GitHub/DogWhistleTF/testProbes.txt"
-    results = testModel(testFileName, modelTrained, classLabels)
+    results = testModel(testFileName, modelTrained, classLabels, vectorizer)
     showResults(results)
 
     modelTime = dt.now().isoformat()[:19].replace(':', '_')
@@ -447,5 +449,5 @@ if __name__ == '__main__':
     useModel(modelTrained, classLabels)
 
     newModel = loadModel(modelFileName)
-    retestResults = testModel(testFileName, newModel, classLabels)
+    retestResults = testModel(testFileName, newModel, classLabels, vectorizer)
     showResults(results)
