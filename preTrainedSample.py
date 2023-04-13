@@ -87,7 +87,7 @@ def acquireData(dataDir):
                 IX = IX -1
                 break
             fpath = dirpath / fname
-            f = open(fpath, encoding="latin-1", errors='ignore')
+            f = open(fpath, encoding="latin-1")
             content = f.read()
             lines = content.replace('.', '\n').split("\n")
             if HEADER:
@@ -287,9 +287,12 @@ def testModel(testFileName, modelTrained, classLabels, vectorizer):
     contents = open(testFileName).readlines()
     results = []
     voc = vectorizer.get_vocabulary(include_special_tokens=False)
+
     for con in contents:
         label, text = con.rstrip().split(',', 1)
-
+        misses = [word for word in text.split(' ') if word not in voc]
+        if misses:
+            raise ValueError(f"Invalid tokens {', '.join(misses)} given")
         probabilities = modelTrained.predict([[text]])
         result = {
             'probe': text,
