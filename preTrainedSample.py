@@ -287,12 +287,13 @@ def testModel(testFileName, modelTrained, classLabels, vectorizer):
     contents = open(testFileName).readlines()
     results = []
     voc = vectorizer.get_vocabulary(include_special_tokens=False)
-
+    # if misses print out error and skip ahead, else do funciton
     for con in contents:
         label, text = con.rstrip().split(',', 1)
         misses = [word for word in text.split(' ') if word not in voc]
         if misses:
-            raise ValueError(f"Invalid tokens {', '.join(misses)} given")
+            print(f"Invalid tokens {', '.join(misses)} given. The prompt: \n{text}\n will be skipped in testing.")
+            continue
         probabilities = modelTrained.predict([[text]])
         result = {
             'probe': text,
@@ -388,12 +389,12 @@ def loadModel(fName):
 
 if __name__ == '__main__':
     startTime = dt.now()
-    embedding_dim = 300
+    embedding_dim = 50
     batchSize = 128
     epochs = 40
     mxSentence = 750  # good: 750 800 900 1000  # bad: 740 720 700 600, 500, 100
     mxVocab = 20000
-    dataSource = ['local', "news"][0]
+    dataSource = ['local', "news"][1]
     if dataSource == "news":
         # news groups
         data_path = keras.utils.get_file(
