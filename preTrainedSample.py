@@ -71,7 +71,7 @@ def acquireData(dataDir):
     class_names = []
     class_index = 0
     maxClassSample = findSampleMax(data_dir, dirnames)
-    for dirname in sorted(dirnames):
+    for dirname in sorted(dirnames)[:5]:
         class_names.append(dirname)
         dirpath = data_dir / dirname
         fnames = os.listdir(dirpath)
@@ -83,7 +83,7 @@ def acquireData(dataDir):
             if DBName == fname:
                 print(f"here {DBName}")
             #if IX >= maxClassSample:
-            if sampleCount >= maxClassSample:
+            if sampleCount >= 100:
                 IX = IX -1
                 break
             fpath = dirpath / fname
@@ -287,12 +287,11 @@ def testModel(testFileName, modelTrained, classLabels, vectorizer):
     contents = open(testFileName).readlines()
     results = []
     voc = vectorizer.get_vocabulary(include_special_tokens=False)
-    # if misses print out error and skip ahead, else do funciton
     for con in contents:
         label, text = con.rstrip().split(',', 1)
         misses = [word for word in text.split(' ') if word not in voc]
         if misses:
-            print(f"Invalid tokens {', '.join(misses)} given. The prompt: \n{text}\n will be skipped in testing.")
+            print(f"Invalid tokens {', '.join(misses)} given. The prompt: \n{text}\nwill be skipped in testing.")
             continue
         probabilities = modelTrained.predict([[text]])
         result = {
@@ -306,7 +305,11 @@ def testModel(testFileName, modelTrained, classLabels, vectorizer):
             'correct': 1 if label == classLabels[np.argmax(probabilities[0])] else 0
         }
         results.append(result)
-    return results
+    if results:
+        return results
+
+    else:
+        return ['All prompts contained uknown tokens']
 
 def showResults(results):
     """
@@ -424,10 +427,9 @@ if __name__ == '__main__':
     modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate,
                               labelsValidate, vectorizer, modelArch,
                               batchSize=batchSize, epochs=epochs)
-    testFileName = "/Users/lance/Documents/GitHub/DogWhistleTF/testProbes.txt"
-    results = testModel(testFileName, modelTrained, classLabels, vectorizer)
-    showResults(results)
-
+    testFileName = r"C:\Users\dsm84762\PycharmProjects\FinalDW\DogWhistleTF\testProbes.txt"
+    '''results = testModel(testFileName, modelTrained, classLabels, vectorizer)
+    showResults(results)'''
     modelTime = dt.now().isoformat()[:19].replace(':', '_')
     modelFileName = f"model_{modelTime}"
     endTime = dt.now()
