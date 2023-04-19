@@ -318,6 +318,11 @@ def showResults(results):
     from a text probe
     :return:
     """
+    try:
+        results[1]
+    except IndexError:
+        print('Attempting to present blank results, exiting showResults')
+        return
     probKeys = results[0]['probabilities'].keys()
 
     print(f"expected label,predicted label,{[' prob, '.join(probKeys)]} prob,probe")
@@ -427,7 +432,7 @@ if __name__ == '__main__':
     modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate,
                               labelsValidate, vectorizer, modelArch,
                               batchSize=batchSize, epochs=epochs)
-    testFileName = r"C:\Users\dsm84762\PycharmProjects\FinalDW\DogWhistleTF\testProbes.txt"
+    testFileName = r"C:\Users\desmo\OneDrive\Desktop\GitHub\DogWhistleTF\testProbes.txt"
     results = testModel(testFileName, modelTrained, classLabels, vectorizer)
     showResults(results)
     modelTime = dt.now().isoformat()[:19].replace(':', '_')
