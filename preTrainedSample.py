@@ -309,7 +309,7 @@ def testModel(testFileName, modelTrained, classLabels, vectorizer):
         return results
 
     else:
-        return ['All prompts contained uknown tokens']
+        return ['All prompts contained unknown tokens']
 
 def showResults(results):
     """
@@ -428,8 +428,8 @@ if __name__ == '__main__':
                               labelsValidate, vectorizer, modelArch,
                               batchSize=batchSize, epochs=epochs)
     testFileName = r"C:\Users\dsm84762\PycharmProjects\FinalDW\DogWhistleTF\testProbes.txt"
-    '''results = testModel(testFileName, modelTrained, classLabels, vectorizer)
-    showResults(results)'''
+    results = testModel(testFileName, modelTrained, classLabels, vectorizer)
+    showResults(results)
     modelTime = dt.now().isoformat()[:19].replace(':', '_')
     modelFileName = f"model_{modelTime}"
     endTime = dt.now()
