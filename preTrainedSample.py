@@ -392,6 +392,7 @@ def loadModel(fName):
     :param fName:
     :return:
     """
+    print(f"Loading local model from {fName}")
     model = load_model(fName)
     return model
 
@@ -462,3 +463,13 @@ if __name__ == '__main__':
     newModel = loadModel(modelFileName)
     retestResults = testModel(testFileName, newModel, classLabels, vectorizer)
     showResults(results)
+
+
+def compareModelResults(model1, model2, classLabels, prompt, simple=True):
+    probabilities1 = model1.predict([[prompt]])
+    bestClass1 = classLabels[np.argmax(probabilities1[0])]
+
+    probabilities2 = model2.predict([[prompt]])
+    bestClass2 = classLabels[np.argmax(probabilities2[0])]
+    if simple:
+        print(f"Model 1 predicted {bestClass1}, Model 2 predicted {bestClass2}")
