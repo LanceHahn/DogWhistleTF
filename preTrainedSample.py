@@ -396,6 +396,15 @@ def loadModel(fName):
     model = load_model(fName)
     return model
 
+def compareModelResults(model1, model2, classLabels, prompt, simple=True):
+    probabilities1 = model1.predict([[prompt]])
+    bestClass1 = classLabels[np.argmax(probabilities1[0])]
+
+    probabilities2 = model2.predict([[prompt]])
+    bestClass2 = classLabels[np.argmax(probabilities2[0])]
+    if simple:
+        print(f"For prompt {prompt}:\n Model 1 predicted {bestClass1}, Model 2 predicted {bestClass2}")
+
 if __name__ == '__main__':
     startTime = dt.now()
     embedding_dim = 50
@@ -462,14 +471,12 @@ if __name__ == '__main__':
 
     newModel = loadModel(modelFileName)
     retestResults = testModel(testFileName, newModel, classLabels, vectorizer)
-    showResults(results)
+    showResults(retestResults)
+
+    lines = []
+    with open(testFileName, 'r') as f:
+        lines.append(f.readlines())
+    for line in lines:
+        compareModelResults(modelTrained, newModel, classLabels, line)
 
 
-def compareModelResults(model1, model2, classLabels, prompt, simple=True):
-    probabilities1 = model1.predict([[prompt]])
-    bestClass1 = classLabels[np.argmax(probabilities1[0])]
-
-    probabilities2 = model2.predict([[prompt]])
-    bestClass2 = classLabels[np.argmax(probabilities2[0])]
-    if simple:
-        print(f"Model 1 predicted {bestClass1}, Model 2 predicted {bestClass2}")
