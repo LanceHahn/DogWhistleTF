@@ -403,7 +403,7 @@ def compareModelResults(model1, model2, classLabels, prompt, simple=True):
     probabilities2 = model2.predict([[prompt]])
     bestClass2 = classLabels[np.argmax(probabilities2[0])]
     if simple:
-        print(f"For prompt {prompt}:\n Model 1 predicted {bestClass1}, Model 2 predicted {bestClass2}")
+        print(f"For prompt {prompt}: Model 1 predicted {bestClass1}, Model 2 predicted {bestClass2}")
 
 if __name__ == '__main__':
     startTime = dt.now()
@@ -473,10 +473,9 @@ if __name__ == '__main__':
     retestResults = testModel(testFileName, newModel, classLabels, vectorizer)
     showResults(retestResults)
 
-    lines = []
     with open(testFileName, 'r') as f:
-        lines.append(f.readlines())
-    for line in lines:
-        compareModelResults(modelTrained, newModel, classLabels, line)
+        for line in f.readlines():
+            line = line.split(',')[1]
+            compareModelResults(modelTrained, newModel, classLabels, line)
 
 
