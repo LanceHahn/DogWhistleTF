@@ -16,6 +16,7 @@ import pathlib
 from datetime import datetime as dt
 import json
 HEADER = False
+DEBUG = False
 dataFocus = ('document', 'sentence', 'line')[2]
 
 def findSampleMax(data_dir, dirnames):
@@ -71,7 +72,8 @@ def acquireData(dataDir):
     class_names = []
     class_index = 0
     maxClassSample = findSampleMax(data_dir, dirnames)
-    for dirname in sorted(dirnames)[:5]:
+    dir_max = 5 if DEBUG else len(dirnames)
+    for dirname in sorted(dirnames)[:dir_max]:
         class_names.append(dirname)
         dirpath = data_dir / dirname
         fnames = os.listdir(dirpath)
@@ -83,7 +85,7 @@ def acquireData(dataDir):
             if DBName == fname:
                 print(f"here {DBName}")
             #if IX >= maxClassSample:
-            if sampleCount >= 100:
+            if sampleCount >= 100 if DEBUG else maxClassSample:
                 IX = IX -1
                 break
             fpath = dirpath / fname
@@ -388,8 +390,7 @@ def saveModel(model, params, fName):
 def loadModel(fName):
     """
     load a pre-trained model
-    NOT TESTED YET
-    :param fName:
+    :param fName: File path of the model to be loaded.
     :return:
     """
     print(f"Loading local model from {fName}")
