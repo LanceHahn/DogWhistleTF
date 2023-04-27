@@ -17,7 +17,7 @@ from datetime import datetime as dt
 import json
 import platform
 HEADER = False
-DEBUG = False
+DEBUG = True
 dataFocus = ('document', 'sentence', 'line')[2]
 
 def findSampleMax(data_dir, dirnames):
@@ -73,7 +73,7 @@ def acquireData(dataDir):
     labels = []
     class_names = []
     class_index = 0
-    maxClassSample = findSampleMax(data_dir, dirnames)
+    maxClassSample = 100 if DEBUG else findSampleMax(data_dir, dirnames)
     dir_max = 5 if DEBUG else len(dirnames)
     for dirname in sorted(dirnames)[:dir_max]:
         class_names.append(dirname)
@@ -87,7 +87,7 @@ def acquireData(dataDir):
             if DBName == fname:
                 print(f"here {DBName}")
             #if IX >= maxClassSample:
-            if sampleCount >= 100 if DEBUG else maxClassSample:
+            if sampleCount >= maxClassSample:
                 IX = IX -1
                 break
             fpath = dirpath / fname
