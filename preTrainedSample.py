@@ -15,6 +15,7 @@ import os
 import pathlib
 from datetime import datetime as dt
 import json
+import platform
 HEADER = False
 DEBUG = False
 dataFocus = ('document', 'sentence', 'line')[2]
@@ -50,6 +51,7 @@ def acquireData(dataDir):
     the subdirectory is treated as the label and the documents are sample data
     :return: list of labels, list of data
     """
+    global DEBUG
     DBName = 'NorthAmer273.txt'
     print(f"Reading in training and testing data from {dataDir}")
     dirnames = os.listdir(dataDir)
@@ -443,7 +445,10 @@ if __name__ == '__main__':
     modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate,
                               labelsValidate, vectorizer, modelArch,
                               batchSize=batchSize, epochs=epochs)
-    testFileName = r"C:\Users\desmo\OneDrive\Desktop\GitHub\DogWhistleTF\testProbes.txt"
+
+    windows = platform.system() == 'Windows'
+    testFileName = r"C:\Users\desmo\OneDrive\Desktop\GitHub\DogWhistleTF\testProbes.txt" if windows else "/Users" \
+                                                                                                         "/lance/Documents/GitHub/DogWhistleTF/testProbes.txt "
     results = testModel(testFileName, modelTrained, classLabels, vectorizer)
     showResults(results)
     modelTime = dt.now().isoformat()[:19].replace(':', '_')
