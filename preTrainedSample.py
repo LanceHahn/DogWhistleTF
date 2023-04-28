@@ -15,7 +15,9 @@ import os
 import pathlib
 from datetime import datetime as dt
 import json
+import platform
 HEADER = False
+DEBUG = True
 dataFocus = ('document', 'sentence', 'line')[2]
 
 def findSampleMax(data_dir, dirnames):
@@ -49,6 +51,7 @@ def acquireData(dataDir):
     the subdirectory is treated as the label and the documents are sample data
     :return: list of labels, list of data
     """
+    global DEBUG
     DBName = 'NorthAmer273.txt'
     print(f"Reading in training and testing data from {dataDir}")
     dirnames = os.listdir(dataDir)
@@ -70,8 +73,9 @@ def acquireData(dataDir):
     labels = []
     class_names = []
     class_index = 0
-    maxClassSample = findSampleMax(data_dir, dirnames)
-    for dirname in sorted(dirnames):
+    maxClassSample = 100 if DEBUG else findSampleMax(data_dir, dirnames)
+    dir_max = 5 if DEBUG else len(dirnames)
+    for dirname in sorted(dirnames)[:dir_max]:
         class_names.append(dirname)
         dirpath = data_dir / dirname
         fnames = os.listdir(dirpath)
@@ -275,7 +279,7 @@ def trainModel(trainData, trainLabels, validData, validLabels, vectorizer,
     return end_to_end_model
 
 # ADD DETECTION OF WORDS THAT AREN'T IN THE VOCABULARY
-def testModel(testFileName, modelTrained, classLabels):
+def testModel(testFileName, modelTrained, classLabels, vectorizer):
     """
     run the model on the contents of a test file that contains
     label, probe text pairs.
@@ -286,8 +290,13 @@ def testModel(testFileName, modelTrained, classLabels):
     """
     contents = open(testFileName).readlines()
     results = []
+    voc = vectorizer.get_vocabulary(include_special_tokens=False)
     for con in contents:
         label, text = con.rstrip().split(',', 1)
+        misses = [word for word in text.split(' ') if word not in voc]
+        if misses:
+            print(f"Invalid tokens {', '.join(misses)} given. The prompt: \n{text}\nwill be skipped in testing.")
+            continue
         probabilities = modelTrained.predict([[text]])
         result = {
             'probe': text,
@@ -300,7 +309,11 @@ def testModel(testFileName, modelTrained, classLabels):
             'correct': 1 if label == classLabels[np.argmax(probabilities[0])] else 0
         }
         results.append(result)
-    return results
+    if results:
+        return results
+
+    else:
+        return ['All prompts contained unknown tokens']
 
 def showResults(results):
     """
@@ -309,6 +322,11 @@ def showResults(results):
     from a text probe
     :return:
     """
+    try:
+        results[1]
+    except IndexError:
+        print('Attempting to present blank results, exiting showResults')
+        return
     probKeys = results[0]['probabilities'].keys()
 
     print(f"expected label,predicted label,{[' prob, '.join(probKeys)]} prob,probe")
@@ -374,21 +392,30 @@ def saveModel(model, params, fName):
 def loadModel(fName):
     """
     load a pre-trained model
-    NOT TESTED YET
-    :param fName:
+    :param fName: File path of the model to be loaded.
     :return:
     """
+    print(f"Loading local model from {fName}")
     model = load_model(fName)
     return model
 
+def compareModelResults(model1, model2, classLabels, prompt, simple=True):
+    probabilities1 = model1.predict([[prompt]])
+    bestClass1 = classLabels[np.argmax(probabilities1[0])]
+
+    probabilities2 = model2.predict([[prompt]])
+    bestClass2 = classLabels[np.argmax(probabilities2[0])]
+    if simple:
+        print(f"For prompt {prompt}: Model 1 predicted {bestClass1}, Model 2 predicted {bestClass2}")
+
 if __name__ == '__main__':
     startTime = dt.now()
-    embedding_dim = 300
+    embedding_dim = 50
     batchSize = 128
     epochs = 40
     mxSentence = 750  # good: 750 800 900 1000  # bad: 740 720 700 600, 500, 100
     mxVocab = 20000
-    dataSource = ['local', "news"][0]
+    dataSource = ['local', "news"][1]
     if dataSource == "news":
         # news groups
         data_path = keras.utils.get_file(
@@ -418,10 +445,12 @@ if __name__ == '__main__':
     modelTrained = trainModel(samplesTrain, labelsTrain, samplesValidate,
                               labelsValidate, vectorizer, modelArch,
                               batchSize=batchSize, epochs=epochs)
-    testFileName = "/Users/lance/Documents/GitHub/DogWhistleTF/testProbes.txt"
-    results = testModel(testFileName, modelTrained, classLabels)
-    showResults(results)
 
+    windows = platform.system() == 'Windows'
+    testFileName = r"C:\Users\desmo\OneDrive\Desktop\GitHub\DogWhistleTF\testProbes.txt" if windows else "/Users" \
+                                                                                                         "/lance/Documents/GitHub/DogWhistleTF/testProbes.txt "
+    results = testModel(testFileName, modelTrained, classLabels, vectorizer)
+    showResults(results)
     modelTime = dt.now().isoformat()[:19].replace(':', '_')
     modelFileName = f"model_{modelTime}"
     endTime = dt.now()
@@ -447,5 +476,12 @@ if __name__ == '__main__':
     useModel(modelTrained, classLabels)
 
     newModel = loadModel(modelFileName)
-    retestResults = testModel(testFileName, newModel, classLabels)
-    showResults(results)
+    retestResults = testModel(testFileName, newModel, classLabels, vectorizer)
+    showResults(retestResults)
+
+    with open(testFileName, 'r') as f:
+        for line in f.readlines():
+            line = line.split(',')[1]
+            compareModelResults(modelTrained, newModel, classLabels, line)
+
+
